@@ -1880,6 +1880,7 @@ void DOUBLEMPM::interpolateParticlesToGrid_DOUBLEMPM(const ProcessorGroup*,
 			bc.setBoundaryCondition(patch, dwi, "Temperature", gTemperature, interp_type);
 			bc.setBoundaryCondition(patch, dwi, "Symmetric", gvelocity, interp_type);
 			bc.setBoundaryCondition(patch, dwi, "SymmetricLiquid", gVelocityLiquid, interp_type);
+			//dbc.setBoundaryConditionLiquid(patch, dwi, "SymmetricLiquid", gVelocityLiquid, interp_type);
 
 		}  // End loop over materials
 
@@ -2593,6 +2594,9 @@ void DOUBLEMPM::computeInternalForce_DOUBLEMPM(const ProcessorGroup*,
 			bc.setBoundaryCondition(patch, dwi, "Symmetric", internalforce, interp_type);
 			bc.setBoundaryCondition(patch, dwi, "Symmetric", gInternalForceLiquid, interp_type);
 			bc.setBoundaryCondition(patch, dwi, "Symmetric", gInternalForceglobalLiquid, interp_type);
+			//dbc.setBoundaryConditionLiquid(patch, dwi, "Symmetric", gInternalForceLiquid, interp_type);
+			//dbc.setBoundaryConditionLiquid(patch, dwi, "Symmetric", gInternalForceglobalLiquid, interp_type);
+
 		}
 
 		for (NodeIterator iter = patch->getNodeIterator(); !iter.done(); iter++) {
@@ -3014,6 +3018,12 @@ void DOUBLEMPM::setGridBoundaryConditions_DOUBLEMPM(const ProcessorGroup*,
 
 			bc.setBoundaryCondition(patch, dwi, "Velocity", gVelocityMix, interp_type);
 			bc.setBoundaryCondition(patch, dwi, "Symmetric", gVelocityMix, interp_type);
+
+			//dbc.setBoundaryConditionLiquid(patch, dwi, "Velocity", gVelocityStarLiquid, interp_type);
+			//dbc.setBoundaryConditionLiquid(patch, dwi, "Symmetric", gVelocityStarLiquid, interp_type);
+
+			//dbc.setBoundaryConditionLiquid(patch, dwi, "Velocity", gVelocityMix, interp_type);
+			//dbc.setBoundaryConditionLiquid(patch, dwi, "Symmetric", gVelocityMix, interp_type);
 
 			// Now recompute acceleration as the difference between the velocity
 			// interpolated to the grid (no bcs applied) and the new velocity_star
@@ -4141,7 +4151,12 @@ void DOUBLEMPM::computeStressTensor(const ProcessorGroup*,
 			for (int p = 0; p < patches->size(); p++) {
 				const Patch* patch = patches->get(p);
 
-				delt_vartype delT_new = 0.0000001;
+				//const ProblemSpecP &prob_spec;
+				//ProblemSpecP time_ps = prob_spec->findBlock("Time");
+				//delt_vartype = time_ps->findBlock("delt_max");
+
+				// set maximum value so it will take time step in other place
+				delt_vartype delT_new = 1;
 				new_dw->put(delt_vartype(delT_new), lb->delTLabel, patch->getLevel());
 
 			}
