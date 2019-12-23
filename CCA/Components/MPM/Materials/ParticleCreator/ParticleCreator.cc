@@ -604,7 +604,7 @@ ParticleCreator::allocateVariables(particleIndex numParticles,
 		new_dw->allocateAndPut(pvars.pPorePressureFilter, double_lb->pPorePressureFilterLabel, subset);
 		new_dw->allocateAndPut(pvars.pPoreTensor, double_lb->pPoreTensorLabel, subset);
 		//new_dw->allocateAndPut(pvars.pPoreTensorFilter, double_lb->pPoreTensorFilterLabel, subset);
-		new_dw->allocateAndPut(pvars.pFreeSurface, double_lb->pFreeSurfaceLabel, subset);
+		//new_dw->allocateAndPut(pvars.pFreeSurface, double_lb->pFreeSurfaceLabel, subset);
 		new_dw->allocateAndPut(pvars.pPorosity, double_lb->pPorosityLabel, subset);
 		new_dw->allocateAndPut(pvars.pPermeability, double_lb->pPermeabilityLabel, subset);
 		new_dw->allocateAndPut(pvars.pVelocityLiquid, double_lb->pVelocityLiquidLabel, subset);
@@ -838,7 +838,7 @@ ParticleCreator::initializeParticle(const Patch* patch,
 		if (d_DOUBLEMPM) {
 			pvars.pPorePressure[i] = 0.0;
 			pvars.pPorePressureFilter[i] = 0.0;
-			pvars.pFreeSurface[i] = 0.0;
+			//pvars.pFreeSurface[i] = 0.0;
 			pvars.pPorosity[i] = matl->getInitialPorosity();
 			pvars.pPermeability[i] = matl->getInitialPermeability();
 			pvars.pVelocityLiquid[i] = Vector(0., 0., 0.);
@@ -1235,8 +1235,8 @@ void ParticleCreator::registerPermanentParticleState(MPMMaterial* matl)
 		particle_state.push_back(double_lb->pBulkModulLiquidLabel);
 		particle_state_preReloc.push_back(double_lb->pBulkModulLiquidLabel_preReloc);
 
-		particle_state.push_back(double_lb->pFreeSurfaceLabel);
-		particle_state_preReloc.push_back(double_lb->pFreeSurfaceLabel_preReloc);
+		//particle_state.push_back(double_lb->pFreeSurfaceLabel);
+		//particle_state_preReloc.push_back(double_lb->pFreeSurfaceLabel_preReloc);
 	}
 
 	if (d_flags->d_GeneralizedAlpha) {

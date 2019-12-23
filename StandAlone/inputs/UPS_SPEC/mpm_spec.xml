@@ -15,6 +15,7 @@
 	  <DOUBLEMPM                          spec="OPTIONAL BOOLEAN" />
 	  <NullSpaceFilter                    spec="OPTIONAL BOOLEAN" />
 	  <FreeSurface                        spec="OPTIONAL BOOLEAN" />
+	  <PorePressureFilter                 spec="OPTIONAL BOOLEAN" />
 	  <GeneralizedAlpha                   spec="OPTIONAL BOOLEAN" />
 	  <SpectralRadius                     spec="OPTIONAL DOUBLE 'positive'"/> 
 	  <Hypoplasticity                     spec="OPTIONAL BOOLEAN" />

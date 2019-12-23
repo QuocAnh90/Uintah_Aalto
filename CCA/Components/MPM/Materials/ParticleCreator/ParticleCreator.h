@@ -128,7 +128,7 @@ namespace Uintah {
 	ParticleVariable<double> pPorePressureFilter;
 	ParticleVariable<Matrix3> pPoreTensor;
 	//ParticleVariable<Matrix3> pPoreTensorFilter;
-	ParticleVariable<double> pFreeSurface;
+	//ParticleVariable<double> pFreeSurface;
 	ParticleVariable<double> pPorosity;
 	ParticleVariable<double> pPermeability;
 	ParticleVariable<Vector> pVelocityLiquid;

@@ -132,9 +132,10 @@ class Output;
     // Flags for DOUBLEMPM
 	bool		d_DOUBLEMPM;
 	bool        d_insertPorePressure;                        // Prescribe Pore Pressure
-	std::string d_insertPorePressureFile;                   // File containing prescribed Pore Pressure
-	bool		d_NullSpaceFilter;
-	bool		d_FreeSurface;
+	std::string d_insertPorePressureFile;                    // File containing prescribed Pore Pressure
+	bool		d_NullSpaceFilter;							 // Using Nullspace Filter (currently for Mohr Coulomb model)
+	bool		d_FreeSurface;								 // Free Surface detection
+	bool		d_PorePressureFilter;						 // Pore Water Pressure filter option
 
 	// Flag for Generalized Alpha scheme
 	bool        d_GeneralizedAlpha;

@@ -111,7 +111,7 @@ DOUBLEMPMLabel::DOUBLEMPMLabel()
 
 	gVelocityMixLabel			= VarLabel::create("g.velocityMix", NCVariable<Vector>::getTypeDescription());
 
-	gVelLiquidSPSSPLabel = VarLabel::create("g.velocityLiquidSPLusSSPlus", NCVariable<Vector>::getTypeDescription());
+	gVelLiquidSPSSPLabel		= VarLabel::create("g.velocityLiquidSPLusSSPlus", NCVariable<Vector>::getTypeDescription());
 
 	gVelocityStarLiquidLabel	= VarLabel::create("g.velocityStarLiquid", NCVariable<Vector>::getTypeDescription());
 

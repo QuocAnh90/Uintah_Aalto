@@ -338,6 +338,28 @@ namespace Uintah {
 			DataWarehouse* old_dw,
 			DataWarehouse* new_dw);
 
+		// XPIC interpolator
+		virtual void scheduleComputeSSPlusVp(SchedulerP&,
+			const PatchSet*,
+			const MaterialSet*);
+
+		virtual void computeSSPlusVp(const ProcessorGroup*,
+			const PatchSubset* patches,
+			const MaterialSubset* matls,
+			DataWarehouse* old_dw,
+			DataWarehouse* new_dw);
+
+		virtual void scheduleComputeSPlusSSPlusVp(SchedulerP&,
+			const PatchSet*,
+			const MaterialSet*);
+
+		virtual void computeSPlusSSPlusVp(const ProcessorGroup*,
+			const PatchSubset* patches,
+			const MaterialSubset* matls,
+			DataWarehouse* old_dw,
+			DataWarehouse* new_dw);
+
+		// Update particle position and velocity
 		virtual void scheduleInterpolateToParticlesAndUpdate_DOUBLEMPM(SchedulerP&,
 			const PatchSet*,
 			const MaterialSet*);

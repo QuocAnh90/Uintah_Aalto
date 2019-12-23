@@ -136,6 +136,7 @@ MPMFlags::MPMFlags(const ProcessorGroup* myworld)
   d_insertPorePressure = false;
   d_NullSpaceFilter = false;
   d_FreeSurface = false;
+  d_PorePressureFilter = false;
 
   // Generalized Alpha scheme
   d_GeneralizedAlpha = false;
@@ -406,8 +407,8 @@ else{
   }
   mpm_flag_ps->get("NullSpaceFilter", d_NullSpaceFilter);
   mpm_flag_ps->get("FreeSurface", d_FreeSurface);
-
-
+  mpm_flag_ps->get("PorePressureFilter", d_PorePressureFilter);
+  
   // Generalized Alpha scheme
   mpm_flag_ps->get("GeneralizedAlpha", d_GeneralizedAlpha);
   mpm_flag_ps->get("SpectralRadius", d_SpectralRadius);
