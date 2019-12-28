@@ -3757,14 +3757,16 @@ void DOUBLEMPM::interpolateToParticlesAndUpdate_DOUBLEMPM(const ProcessorGroup*,
 					}
 
 					// Update the particle's pos and vel using std "FLIP" method
-					//pxnew[idx] = px[idx] + velLiquid * delT;
+					pxnew[idx] = px[idx] + velLiquid * delT;
 					//pdispnew[idx] = pdisp[idx] + velLiquid * delT;
 					//pvelLiquidnew[idx] = pVelocityLiquid[idx] + accLiquid * delT;
 
 					// Update particle vel and pos using Nairn's XPIC(2) method
-					pxnew[idx] = px[idx] + velLiquid * delT
-						- 0.5*(accLiquid*delT + (pVelocityLiquid[idx] - 2.0*pvelLiquidSSPlus[idx])
-							+ velLiquidSSPSSP)*delT;
+					//pxnew[idx] = px[idx] + velLiquid * delT
+					//	- 0.5*(accLiquid*delT + (pVelocityLiquid[idx] - 2.0*pvelLiquidSSPlus[idx])
+					//		+ velLiquidSSPSSP)*delT;
+					
+					//cerr << pvelLiquidSSPlus[idx] << " " << velLiquidSSPSSP << endl;
 					pvelLiquidnew[idx] = 2.0*pvelLiquidSSPlus[idx] - velLiquidSSPSSP + accLiquid * delT;
 					pdispnew[idx] = pdisp[idx] + (pxnew[idx] - px[idx]);
 					pvelnew[idx] = 0;
@@ -3835,6 +3837,7 @@ void DOUBLEMPM::interpolateToParticlesAndUpdate_DOUBLEMPM(const ProcessorGroup*,
 			}
 
 			else {  // Not XPIC(2)
+
 				// Loop over particles
 				if (particleType == "liquid") {
 					for (ParticleSubset::iterator iter = pset->begin();
