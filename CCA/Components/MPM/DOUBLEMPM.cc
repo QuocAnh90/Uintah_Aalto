@@ -3245,6 +3245,7 @@ void DOUBLEMPM::setPrescribedMotion(const ProcessorGroup*,
 
 
 // XPIC Interpolator
+
 void DOUBLEMPM::scheduleComputeSSPlusVp(SchedulerP& sched,
 	const PatchSet* patches,
 	const MaterialSet* matls)
@@ -3266,12 +3267,10 @@ void DOUBLEMPM::scheduleComputeSSPlusVp(SchedulerP& sched,
 
 	// Solid
 	t->requires(Task::NewDW, lb->gVelocityLabel, gac, NGN);
-
 	t->computes(lb->pVelocitySSPlusLabel);
 
 	// Liquid
 	t->requires(Task::NewDW, double_lb->gVelocityLiquidLabel, gac, NGN);
-
 	t->computes(double_lb->pVelocityLiquidSSPlusLabel);
 
 	sched->addTask(t, patches, matls);
@@ -3465,6 +3464,191 @@ void DOUBLEMPM::computeSPlusSSPlusVp(const ProcessorGroup*,
 	}
 }
 
+/*
+void DOUBLEMPM::scheduleComputeSSPlusVp(SchedulerP& sched,
+	const PatchSet* patches,
+	const MaterialSet* matls)
+{
+	if (!flags->doMPMOnLevel(getLevel(patches)->getIndex(),
+		getLevel(patches)->getGrid()->numLevels()))
+		return;
+
+	printSchedule(patches, cout_doing, "DOUBLEMPM::scheduleComputeSSPlusVp");
+
+	Task* t = scinew Task("DOUBLEMPM::computeSSPlusVp",
+		this, &DOUBLEMPM::computeSSPlusVp);
+
+	Ghost::GhostType gac = Ghost::AroundCells;
+	Ghost::GhostType gnone = Ghost::None;
+	t->requires(Task::OldDW, lb->pXLabel, gnone);
+	t->requires(Task::NewDW, lb->pCurSizeLabel, gnone);
+	//  t->requires(Task::OldDW, lb->pDeformationMeasureLabel,        gnone);
+
+	t->requires(Task::NewDW, lb->gVelocityLabel, gac, NGN);
+
+	t->computes(lb->pVelocitySSPlusLabel);
+
+	sched->addTask(t, patches, matls);
+}
+
+void DOUBLEMPM::scheduleComputeSPlusSSPlusVp(SchedulerP& sched,
+	const PatchSet* patches,
+	const MaterialSet* matls)
+{
+	if (!flags->doMPMOnLevel(getLevel(patches)->getIndex(),
+		getLevel(patches)->getGrid()->numLevels()))
+		return;
+
+	printSchedule(patches, cout_doing, "DOUBLEMPM::scheduleComputeSPlusSSPlusVp");
+
+	Task* t = scinew Task("DOUBLEMPM::computeSPlusSSPlusVp",
+		this, &DOUBLEMPM::computeSPlusSSPlusVp);
+
+	Ghost::GhostType gan = Ghost::AroundNodes;
+	Ghost::GhostType gac = Ghost::AroundCells;
+	t->requires(Task::OldDW, lb->pXLabel, gan, NGP);
+	t->requires(Task::OldDW, lb->pMassLabel, gan, NGP);
+	t->requires(Task::NewDW, lb->pCurSizeLabel, gan, NGP);
+	//  t->requires(Task::OldDW, lb->pDeformationMeasureLabel,    gan, NGP);
+	t->requires(Task::NewDW, lb->pVelocitySSPlusLabel, gan, NGP);
+	t->requires(Task::NewDW, lb->gMassLabel, gac, NGN);
+
+	t->computes(lb->gVelSPSSPLabel);
+
+	sched->addTask(t, patches, matls);
+}
+
+
+void DOUBLEMPM::computeSSPlusVp(const ProcessorGroup*,
+	const PatchSubset* patches,
+	const MaterialSubset*,
+	DataWarehouse* old_dw,
+	DataWarehouse* new_dw)
+{
+	for (int p = 0; p < patches->size(); p++) {
+		const Patch* patch = patches->get(p);
+		printTask(patches, patch, cout_doing,
+			"Doing DOUBLEMPM::computeSSPlusVp");
+
+		ParticleInterpolator* interpolator = flags->d_interpolator->clone(patch);
+		vector<IntVector> ni(interpolator->size());
+		vector<double> S(interpolator->size());
+		vector<Vector> d_S(interpolator->size());
+
+		unsigned int numMPMMatls = m_materialManager->getNumMatls("MPM");
+		for (unsigned int m = 0; m < numMPMMatls; m++) {
+			MPMMaterial* mpm_matl = (MPMMaterial*)m_materialManager->getMaterial("MPM", m);
+			int dwi = mpm_matl->getDWIndex();
+
+			// Get the arrays of particle values to be changed
+			constParticleVariable<Point> px;
+			constParticleVariable<Matrix3> psize;
+			constParticleVariable<Matrix3> pFOld;
+			ParticleVariable<Vector> pvelSSPlus;
+			constNCVariable<Vector> gvelocity;
+
+			ParticleSubset* pset = old_dw->getParticleSubset(dwi, patch);
+
+			old_dw->get(px, lb->pXLabel, pset);
+			new_dw->get(psize, lb->pCurSizeLabel, pset);
+			//      old_dw->get(pFOld,    lb->pDeformationMeasureLabel,        pset);
+
+			new_dw->allocateAndPut(pvelSSPlus, lb->pVelocitySSPlusLabel, pset);
+
+			Ghost::GhostType  gac = Ghost::AroundCells;
+			new_dw->get(gvelocity, lb->gVelocityLabel, dwi, patch, gac, NGP);
+
+			// Loop over particles
+			for (ParticleSubset::iterator iter = pset->begin();
+				iter != pset->end(); iter++) {
+				particleIndex idx = *iter;
+
+				// Get the node indices that surround the cell
+				int NN = interpolator->findCellAndWeights(px[idx], ni, S,
+					psize[idx]);
+				// Accumulate the contribution from each surrounding vertex
+				Vector vel(0.0, 0.0, 0.0);
+				for (int k = 0; k < NN; k++) {
+					IntVector node = ni[k];
+					vel += gvelocity[node] * S[k];
+				}
+				pvelSSPlus[idx] = vel;
+			}
+		}
+		delete interpolator;
+	}
+}
+
+void DOUBLEMPM::computeSPlusSSPlusVp(const ProcessorGroup*,
+	const PatchSubset* patches,
+	const MaterialSubset*,
+	DataWarehouse* old_dw,
+	DataWarehouse* new_dw)
+{
+	for (int p = 0; p < patches->size(); p++) {
+		const Patch* patch = patches->get(p);
+		printTask(patches, patch, cout_doing,
+			"Doing DOUBLEMPM::computeSPlusSSPlusVp");
+
+		ParticleInterpolator* interpolator = flags->d_interpolator->clone(patch);
+		vector<IntVector> ni(interpolator->size());
+		vector<double> S(interpolator->size());
+		vector<Vector> d_S(interpolator->size());
+		Ghost::GhostType  gan = Ghost::AroundNodes;
+		Ghost::GhostType  gac = Ghost::AroundCells;
+
+		unsigned int numMPMMatls = m_materialManager->getNumMatls("MPM");
+		for (unsigned int m = 0; m < numMPMMatls; m++) {
+			MPMMaterial* mpm_matl = (MPMMaterial*)m_materialManager->getMaterial("MPM", m);
+			int dwi = mpm_matl->getDWIndex();
+			// Get the arrays of particle values to be changed
+			constParticleVariable<Point> px;
+			constParticleVariable<Matrix3> psize, pFOld;
+			constParticleVariable<Vector> pvelSSPlus;
+			constParticleVariable<double> pmass;
+
+			NCVariable<Vector> gvelSPSSP;
+			constNCVariable<double> gmass;
+
+			ParticleSubset* pset = old_dw->getParticleSubset(dwi, patch,
+				gan, NGP, lb->pXLabel);
+
+			old_dw->get(px, lb->pXLabel, pset);
+			old_dw->get(pmass, lb->pMassLabel, pset);
+			new_dw->get(psize, lb->pCurSizeLabel, pset);
+			//      old_dw->get(pFOld,      lb->pDeformationMeasureLabel,        pset);
+			new_dw->get(pvelSSPlus, lb->pVelocitySSPlusLabel, pset);
+			new_dw->get(gmass, lb->gMassLabel, dwi, patch, gac, NGP);
+			new_dw->allocateAndPut(gvelSPSSP, lb->gVelSPSSPLabel, dwi, patch);
+
+			gvelSPSSP.initialize(Vector(0, 0, 0));
+
+			// Loop over particles
+			for (ParticleSubset::iterator iter = pset->begin();
+				iter != pset->end(); iter++) {
+				particleIndex idx = *iter;
+				int NN =
+					interpolator->findCellAndWeights(px[idx], ni, S, psize[idx]);
+				Vector pmom = pvelSSPlus[idx] * pmass[idx];
+
+				IntVector node;
+				for (int k = 0; k < NN; k++) {
+					node = ni[k];
+					if (patch->containsNode(node)) {
+						gvelSPSSP[node] += pmom * S[k];
+					}
+				}
+			} // End of particle loop
+			for (NodeIterator iter = patch->getExtraNodeIterator();
+				!iter.done(); iter++) {
+				IntVector c = *iter;
+				gvelSPSSP[c] /= gmass[c];
+			}
+		}
+		delete interpolator;
+	}
+}
+*/
 
 // Update position and velocity
 void DOUBLEMPM::scheduleInterpolateToParticlesAndUpdate_DOUBLEMPM(SchedulerP& sched,
@@ -3526,10 +3710,12 @@ void DOUBLEMPM::scheduleInterpolateToParticlesAndUpdate_DOUBLEMPM(SchedulerP& sc
 	t->requires(Task::OldDW, double_lb->pVelocityLiquidLabel, gnone);
 	t->computes(double_lb->pVelocityLiquidLabel_preReloc);
 
+	
 	if (flags->d_XPIC2) {
 		t->requires(Task::NewDW, double_lb->gVelLiquidSPSSPLabel, gac, NGN);
 		t->requires(Task::NewDW, double_lb->pVelocityLiquidSSPlusLabel, gnone);
 	}
+	
 
 	//__________________________________
 	//  reduction variables
@@ -3714,7 +3900,7 @@ void DOUBLEMPM::interpolateToParticlesAndUpdate_DOUBLEMPM(const ProcessorGroup*,
 			new_dw->get(gVelocityStarLiquid, double_lb->gVelocityStarLiquidLabel, dwi, patch, gac, NGP);
 			old_dw->get(pVelocityLiquid, double_lb->pVelocityLiquidLabel, pset);
 			new_dw->allocateAndPut(pvelLiquidnew, double_lb->pVelocityLiquidLabel_preReloc, pset);
-
+		
 			if (flags->d_XPIC2) {
 				new_dw->get(pvelLiquidSSPlus, double_lb->pVelocityLiquidSSPlusLabel, pset);
 				new_dw->get(gvelLiquidSPSSP, double_lb->gVelLiquidSPSSPLabel, dwi, patch, gac, NGP);
@@ -3725,115 +3911,122 @@ void DOUBLEMPM::interpolateToParticlesAndUpdate_DOUBLEMPM(const ProcessorGroup*,
 			if (flags->d_XPIC2) {
 
 			// Loop over particles
-			if (particleType == "liquid") {
-				for (ParticleSubset::iterator iter = pset->begin();
-					iter != pset->end(); iter++) {
-					particleIndex idx = *iter;
-
-					// Get the node indices that surround the cell
-					int NN = interpolator->findCellAndWeights(px[idx], ni, S,
-						pCursize[idx]);
-
-					Vector velLiquid(0.0, 0.0, 0.0);
-					Vector accLiquid(0.0, 0.0, 0.0);
-					Vector velLiquidSSPSSP(0.0, 0.0, 0.0);
-					double fricTempRate = 0.0;
-					double tempRate = 0.0;
-					double burnFraction = 0.0;
-
-					// Accumulate the contribution from each surrounding vertex
-					for (int k = 0; k < NN; k++) {
-						IntVector node = ni[k];
-
-						// Liquid
-						velLiquid		+= gVelocityStarLiquid[node] * S[k];
-						velLiquidSSPSSP += gvelLiquidSPSSP[node] * S[k];
-						accLiquid		+= gAccelerationLiquid[node] * S[k];
-
-						fricTempRate = frictionTempRate[node] * flags->d_addFrictionWork;
-						tempRate += (gTemperatureRate[node] + dTdt[node] +
-							fricTempRate)   * S[k];
-						burnFraction += massBurnFrac[node] * S[k];
-					}
-
-					// Update the particle's pos and vel using std "FLIP" method
-					pxnew[idx] = px[idx] + velLiquid * delT;
-					//pdispnew[idx] = pdisp[idx] + velLiquid * delT;
-					//pvelLiquidnew[idx] = pVelocityLiquid[idx] + accLiquid * delT;
-
-					// Update particle vel and pos using Nairn's XPIC(2) method
-					//pxnew[idx] = px[idx] + velLiquid * delT
-					//	- 0.5*(accLiquid*delT + (pVelocityLiquid[idx] - 2.0*pvelLiquidSSPlus[idx])
-					//		+ velLiquidSSPSSP)*delT;
-					
-					//cerr << pvelLiquidSSPlus[idx] << " " << velLiquidSSPSSP << endl;
-					pvelLiquidnew[idx] = 2.0*pvelLiquidSSPlus[idx] - velLiquidSSPSSP + accLiquid * delT;
-					pdispnew[idx] = pdisp[idx] + (pxnew[idx] - px[idx]);
-					pvelnew[idx] = 0;
 				
-					pTempNew[idx] = pTemperature[idx] + tempRate * delT;
-					pTempPreNew[idx] = pTemperature[idx]; // for thermal stress
-					pMassSolidNew[idx] = Max(pMassSolid[idx] * (1. - burnFraction), 0.);
-					psizeNew[idx] = (pMassSolidNew[idx] / pMassSolid[idx])*psize[idx];
-					ke += .5*pMassSolid[idx] * pvelnew[idx].length2();
-					CMX = CMX + (pxnew[idx] * pMassSolid[idx]).asVector();
-					totalMom += pvelnew[idx] * pMassSolid[idx];
-					totalmass += pMassSolid[idx];
-				}
-			}
+				if (particleType == "liquid") {
+					for (ParticleSubset::iterator iter = pset->begin();
+						iter != pset->end(); iter++) {
+						particleIndex idx = *iter;
 
-			if (particleType == "solid") {
-				for (ParticleSubset::iterator iter = pset->begin();
-					iter != pset->end(); iter++) {
-					particleIndex idx = *iter;
+						// Get the node indices that surround the cell
+						int NN = interpolator->findCellAndWeights(px[idx], ni, S,
+							pCursize[idx]);
 
-					// Get the node indices that surround the cell
-					int NN = interpolator->findCellAndWeights(px[idx], ni, S,
-						pCursize[idx]);
+						Vector velLiquid(0.0, 0.0, 0.0);
+						Vector accLiquid(0.0, 0.0, 0.0);
+						Vector velLiquidSSPSSP(0.0, 0.0, 0.0);
+						double fricTempRate = 0.0;
+						double tempRate = 0.0;
+						double burnFraction = 0.0;
 
-					Vector vel(0.0, 0.0, 0.0);
-					Vector acc(0.0, 0.0, 0.0);
-					double fricTempRate = 0.0;
-					double tempRate = 0.0;
-					double burnFraction = 0.0;
-					Vector velSSPSSP(0.0, 0.0, 0.0);
+						// Accumulate the contribution from each surrounding vertex
+						for (int k = 0; k < NN; k++) {
+							IntVector node = ni[k];
 
-					// Accumulate the contribution from each surrounding vertex
-					for (int k = 0; k < NN; k++) {
-						IntVector node = ni[k];
+							// Liquid
+							velLiquid		+= gVelocityStarLiquid[node] * S[k];
+							velLiquidSSPSSP += gvelLiquidSPSSP[node] * S[k];
+							accLiquid		+= gAccelerationLiquid[node] * S[k];
 
-						// Solid
-						vel += gvelocity_star[node] * S[k];
-						velSSPSSP += gvelSPSSP[node] * S[k];
-						acc += gacceleration[node] * S[k];
+							fricTempRate = frictionTempRate[node] * flags->d_addFrictionWork;
+							tempRate += (gTemperatureRate[node] + dTdt[node] +
+								fricTempRate)   * S[k];
+							burnFraction += massBurnFrac[node] * S[k];
+						}
 
-						fricTempRate = frictionTempRate[node] * flags->d_addFrictionWork;
-						tempRate += (gTemperatureRate[node] + dTdt[node] +
-							fricTempRate)   * S[k];
-						burnFraction += massBurnFrac[node] * S[k];
-					}
+						// Update the particle's pos and vel using std "FLIP" method
+						pxnew[idx] = px[idx] + velLiquid * delT;
+						//pdispnew[idx] = pdisp[idx] + velLiquid * delT;
+						//pvelLiquidnew[idx] = pVelocityLiquid[idx] + accLiquid * delT;
 
-					// Fix solid particles
-					pxnew[idx] = px[idx];
-
-					// Update particle vel and pos using Nairn's XPIC(2) method
-					//pxnew[idx] = px[idx] + vel * delT
-					//	- 0.5*(acc*delT + (pvelocity[idx] - 2.0*pvelSSPlus[idx])
-					//		+ velSSPSSP)*delT;
-					pvelnew[idx] = 2.0*pvelSSPlus[idx] - velSSPSSP + acc * delT;
-					pdispnew[idx] = pdisp[idx] + (pxnew[idx] - px[idx]);
-					pvelLiquidnew[idx] = 0;
+						// Update particle vel and pos using Nairn's XPIC(2) method
+						//pxnew[idx] = px[idx] + velLiquid * delT
+						//	- 0.5*(accLiquid*delT + (pVelocityLiquid[idx] - 2.0*pvelLiquidSSPlus[idx])
+						//		+ velLiquidSSPSSP)*delT;
 					
-					pTempNew[idx] = pTemperature[idx] + tempRate * delT;
-					pTempPreNew[idx] = pTemperature[idx]; // for thermal stress
-					pMassSolidNew[idx] = Max(pMassSolid[idx] * (1. - burnFraction), 0.);
-					psizeNew[idx] = (pMassSolidNew[idx] / pMassSolid[idx])*psize[idx];
-					ke += .5*pMassSolid[idx] * pvelnew[idx].length2();
-					CMX = CMX + (pxnew[idx] * pMassSolid[idx]).asVector();
-					totalMom += pvelnew[idx] * pMassSolid[idx];
-					totalmass += pMassSolid[idx];
+						//cerr << pvelLiquidSSPlus[idx] << " " << velLiquidSSPSSP << endl;
+						pvelLiquidnew[idx] = 2.0*pvelLiquidSSPlus[idx] - velLiquidSSPSSP + accLiquid * delT;
+						pdispnew[idx] = pdisp[idx] + (pxnew[idx] - px[idx]);
+						pvelnew[idx] = 0;
+				
+						pTempNew[idx] = pTemperature[idx] + tempRate * delT;
+						pTempPreNew[idx] = pTemperature[idx]; // for thermal stress
+						pMassSolidNew[idx] = Max(pMassSolid[idx] * (1. - burnFraction), 0.);
+						psizeNew[idx] = (pMassSolidNew[idx] / pMassSolid[idx])*psize[idx];
+						ke += .5*pMassSolid[idx] * pvelnew[idx].length2();
+						CMX = CMX + (pxnew[idx] * pMassSolid[idx]).asVector();
+						totalMom += pvelnew[idx] * pMassSolid[idx];
+						totalmass += pMassSolid[idx];
+					}
 				}
-			}
+			
+				if (particleType == "solid") {
+					for (ParticleSubset::iterator iter = pset->begin();
+						iter != pset->end(); iter++) {
+						particleIndex idx = *iter;
+
+						// Get the node indices that surround the cell
+						int NN = interpolator->findCellAndWeights(px[idx], ni, S,
+							pCursize[idx]);
+
+						Vector vel(0.0, 0.0, 0.0);
+						Vector acc(0.0, 0.0, 0.0);
+						double fricTempRate = 0.0;
+						double tempRate = 0.0;
+						double burnFraction = 0.0;
+						Vector velSSPSSP(0.0, 0.0, 0.0);
+
+						// Accumulate the contribution from each surrounding vertex
+						for (int k = 0; k < NN; k++) {
+							IntVector node = ni[k];
+
+							// Solid
+							vel += gvelocity_star[node] * S[k];
+							velSSPSSP += gvelSPSSP[node] * S[k];
+							acc += gacceleration[node] * S[k];
+
+							fricTempRate = frictionTempRate[node] * flags->d_addFrictionWork;
+							tempRate += (gTemperatureRate[node] + dTdt[node] +
+								fricTempRate)   * S[k];
+							burnFraction += massBurnFrac[node] * S[k];
+						}
+
+						// Fix solid particles
+						//pxnew[idx] = px[idx];
+
+						// Update particle vel and pos using Nairn's XPIC(2) method
+						pxnew[idx] = px[idx] + vel * delT
+							- 0.5*(acc*delT + (pvelocity[idx] - 2.0*pvelSSPlus[idx])
+								+ velSSPSSP)*delT;
+						pvelnew[idx] = 2.0*pvelSSPlus[idx] - velSSPSSP + acc * delT;
+						pdispnew[idx] = pdisp[idx] + (pxnew[idx] - px[idx]);
+						pvelLiquidnew[idx] = 0;
+	#if 0
+						// PIC, or XPIC(1)
+						pxnew[idx] = px[idx] + vel * delT
+							- 0.5*(acc*delT + (pvelocity[idx] - pvelSSPlus[idx]))*delT;
+						pvelnew[idx] = pvelSSPlus[idx] + acc * delT;
+	#endif
+
+						pTempNew[idx] = pTemperature[idx] + tempRate * delT;
+						pTempPreNew[idx] = pTemperature[idx]; // for thermal stress
+						pMassSolidNew[idx] = Max(pMassSolid[idx] * (1. - burnFraction), 0.);
+						psizeNew[idx] = (pMassSolidNew[idx] / pMassSolid[idx])*psize[idx];
+						ke += .5*pMassSolid[idx] * pvelnew[idx].length2();
+						CMX = CMX + (pxnew[idx] * pMassSolid[idx]).asVector();
+						totalMom += pvelnew[idx] * pMassSolid[idx];
+						totalmass += pMassSolid[idx];
+					}
+				}
 			}
 
 			else {  // Not XPIC(2)
