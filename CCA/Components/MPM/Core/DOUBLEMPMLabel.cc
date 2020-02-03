@@ -117,6 +117,8 @@ DOUBLEMPMLabel::DOUBLEMPMLabel()
 
 	gInternalForceLiquidLabel	= VarLabel::create("g.internalforceLiquid", NCVariable<Vector>::getTypeDescription());
 
+	//gInternalForceStructureLabel = VarLabel::create("g.internalforceStructure", NCVariable<Vector>::getTypeDescription());
+
 	gPorosityLabel = VarLabel::create("g.Porosity", NCVariable<double>::getTypeDescription());
 
 	gDragForceLabel				= VarLabel::create("g.DragForce", NCVariable<Vector>::getTypeDescription());
@@ -210,36 +212,28 @@ DOUBLEMPMLabel::~DOUBLEMPMLabel()
 	VarLabel::destroy(gVelocityMixLabel);
 	VarLabel::destroy(gVelocityStarLiquidLabel);
 	VarLabel::destroy(gVelLiquidSPSSPLabel);
-
 	VarLabel::destroy(gInternalForceLiquidLabel);
-
+	//VarLabel::destroy(gInternalForceStructureLabel);
 	VarLabel::destroy(gPorosityLabel);
 	VarLabel::destroy(gDragForceLabel);
 	VarLabel::destroy(gGradientVelocityLabel);
-
 	VarLabel::destroy(gMassSolidLabel);
 	//VarLabel::destroy(gVolumeSolidLabel);
 	//VarLabel::destroy(gVeloctySolidLabel);
-
 	VarLabel::destroy(gPorePressureLabel);
 	VarLabel::destroy(gPorePressureFilterLabel);
 	VarLabel::destroy(gPoreTensorLabel);
 	VarLabel::destroy(gPoreTensorFilterLabel);
-
 	VarLabel::destroy(gStressLabel);
-
 	VarLabel::destroy(gDraggingLabel);
-
 	VarLabel::destroy(gnodeSurfaceLabel);
 
 	// Cell variables
 	VarLabel::destroy(VolumeRatioLabel);
 
-
 	// Generalized Alpha scheme
 	VarLabel::destroy(pAccelerationLiquidLabel);
 	VarLabel::destroy(pAccelerationLiquidLabel_preReloc);
-
 	VarLabel::destroy(gAccelerationLiquidBeginLabel);
 	VarLabel::destroy(gAccelerationLiquidBeginNewLabel);
 	VarLabel::destroy(gAccelerationLiquidMiddleLabel);

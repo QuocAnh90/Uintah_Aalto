@@ -599,7 +599,7 @@ ParticleCreator::allocateVariables(particleIndex numParticles,
 	}
 
 	// DOUBLEMPM
-	if (d_flags->d_DOUBLEMPM) {
+	if (d_DOUBLEMPM) {
 		new_dw->allocateAndPut(pvars.pPorePressure, double_lb->pPorePressureLabel, subset);
 		new_dw->allocateAndPut(pvars.pPorePressureFilter, double_lb->pPorePressureFilterLabel, subset);
 		new_dw->allocateAndPut(pvars.pPoreTensor, double_lb->pPoreTensorLabel, subset);
@@ -617,10 +617,10 @@ ParticleCreator::allocateVariables(particleIndex numParticles,
 	}
 
 	// Generalized alpha
-	if (d_flags->d_GeneralizedAlpha) {
+	if (d_GeneralizedAlpha) {
 		new_dw->allocateAndPut(pvars.pAcceleration, d_lb->pAccelerationLabel, subset);
 
-		if (d_flags->d_DOUBLEMPM) {
+		if (d_DOUBLEMPM) {
 			new_dw->allocateAndPut(pvars.pAccelerationLiquid, double_lb->pAccelerationLiquidLabel, subset);
 		}
 	}
@@ -854,7 +854,7 @@ ParticleCreator::initializeParticle(const Patch* patch,
 		// Generalized alpha
 		if (d_GeneralizedAlpha) {
 			pvars.pAcceleration[i] = Vector(0., 0., 0.);
-			if (d_flags->d_DOUBLEMPM) {
+			if (d_DOUBLEMPM) {
 				pvars.pAccelerationLiquid[i] = Vector(0., 0., 0.);
 			}
 
@@ -1201,7 +1201,7 @@ void ParticleCreator::registerPermanentParticleState(MPMMaterial* matl)
 	}
 
 	// DOUBLEMPM
-	if (d_flags->d_DOUBLEMPM) {
+	if (d_DOUBLEMPM) {
 		particle_state.push_back(double_lb->pPorePressureLabel);
 		particle_state_preReloc.push_back(double_lb->pPorePressureLabel_preReloc);
 
@@ -1239,11 +1239,11 @@ void ParticleCreator::registerPermanentParticleState(MPMMaterial* matl)
 		//particle_state_preReloc.push_back(double_lb->pFreeSurfaceLabel_preReloc);
 	}
 
-	if (d_flags->d_GeneralizedAlpha) {
+	if (d_GeneralizedAlpha) {
 		particle_state.push_back(d_lb->pAccelerationLabel);
 		particle_state_preReloc.push_back(d_lb->pAccelerationLabel_preReloc);
 
-		if (d_flags->d_DOUBLEMPM) {
+		if (d_DOUBLEMPM) {
 			particle_state.push_back(double_lb->pAccelerationLiquidLabel);
 			particle_state_preReloc.push_back(double_lb->pAccelerationLiquidLabel_preReloc);
 		}

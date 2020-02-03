@@ -1499,7 +1499,7 @@ void DOUBLEMPM::scheduleInterpolateParticlesToGrid_DOUBLEMPM(SchedulerP& sched,
 		this, &DOUBLEMPM::interpolateParticlesToGrid_DOUBLEMPM);
 	Ghost::GhostType  gan = Ghost::AroundNodes;
 
-	//t->requires(Task::OldDW, lb->pMassLabel, gan, NGP);
+	t->requires(Task::OldDW, lb->pMassLabel, gan, NGP);
 	t->requires(Task::OldDW, lb->pVolumeLabel, gan, NGP);
 	
 	if (flags->d_GEVelProj) {
@@ -1636,7 +1636,7 @@ void DOUBLEMPM::interpolateParticlesToGrid_DOUBLEMPM(const ProcessorGroup*,
 
 			// Create arrays for the particle data
 			constParticleVariable<Point>  px;
-			//constParticleVariable<double> pmass;
+			constParticleVariable<double> pmass;
 
 			// original MPM variables
 			constParticleVariable<double> pTemperature, pColor, pvolume;
@@ -1648,7 +1648,7 @@ void DOUBLEMPM::interpolateParticlesToGrid_DOUBLEMPM(const ProcessorGroup*,
 			constParticleVariable<Vector>  pTempGrad;
 					   			
 			old_dw->get(px, lb->pXLabel, pset);									// get input pXLabel
-			//old_dw->get(pmass, lb->pMassLabel, pset);		
+			old_dw->get(pmass, lb->pMassLabel, pset);		
 			old_dw->get(pTemperature, lb->pTemperatureLabel, pset);
 			new_dw->get(psize, lb->pCurSizeLabel, pset);
 			//old_dw->get(psize, lb->pSizeLabel, pset);
@@ -1762,7 +1762,7 @@ void DOUBLEMPM::interpolateParticlesToGrid_DOUBLEMPM(const ProcessorGroup*,
 				for (ParticleSubset::iterator iter = pset->begin();
 					iter != pset->end(); iter++) {
 					particleIndex idx = *iter;
-					int NN = interpolator->findCellAndWeights(px[idx], ni, S, psize[idx]);			// NN : total interacting nodes number
+					int NN = interpolator->findCellAndWeights(px[idx], ni, S, psize[idx]);
 					Vector pmom_liquid = pvelocityLiquid[idx] * pMassLiquid[idx];
 
 					// Add each particles contribution to the local mass & velocity
@@ -1781,6 +1781,7 @@ void DOUBLEMPM::interpolateParticlesToGrid_DOUBLEMPM(const ProcessorGroup*,
 							}
 
 							// Liquid
+							gmass[node] += pMassLiquid[idx] * S[k];
 							gvolumeLiquid[node] += pvolume[idx] * S[k];
 							gmassLiquid[node] += pMassLiquid[idx] * S[k];
 							gVelocityLiquid[node] += pmom_liquid * S[k];
@@ -1790,14 +1791,14 @@ void DOUBLEMPM::interpolateParticlesToGrid_DOUBLEMPM(const ProcessorGroup*,
 			}
 
 			// solid particles
-			if (particleType == "solid") {
+			if (particleType == "solid" || particleType == "structure") {
 				for (ParticleSubset::iterator iter = pset->begin();
 					iter != pset->end(); iter++) {
 					particleIndex idx = *iter;
-					int NN = interpolator->findCellAndWeights(px[idx], ni, S, psize[idx]);			// NN : total interacting nodes number
+					int NN = interpolator->findCellAndWeights(px[idx], ni, S, psize[idx]);
 					Vector pmom = pvelocity[idx] * pMassSolid[idx];													// px: particle position, ni: index of node vector
 					//Vector pmom = pvelocity[idx] * pMassSolid[idx];
-					double ptemp_ext = pTemperature[idx];														// S: shape function
+					double ptemp_ext = pTemperature[idx];
 					total_mom += pmom;
 
 					// Add each particles contribution to the local mass & velocity
@@ -1823,8 +1824,14 @@ void DOUBLEMPM::interpolateParticlesToGrid_DOUBLEMPM(const ProcessorGroup*,
 							gSp_vol[node] += pSp_vol * pMassSolid[idx] * S[k];					// nodal initial volume
 
 							// Solid
-							//gmass[node] += pmass[idx] * S[k];
-							gmass[node] += pMassSolid[idx] * S[k];			// simply let gmass = gmassSolid
+							if (particleType == "structure") {
+								gmass[node] += pmass[idx] * S[k];
+								gVelocityLiquid[node] += pmom * S[k];
+							}
+							else if (particleType == "solid") {
+								gmass[node] += pMassSolid[idx] * S[k];
+							}
+
 							gvolume[node] += pvolume[idx] * S[k];
 							gmassSolid[node] += pMassSolid[idx] * S[k];
 							gvelocity[node] += pmom * S[k];
@@ -1936,7 +1943,7 @@ void DOUBLEMPM::scheduleComputeNormals_DOUBLEMPM(SchedulerP   & sched,
 	z_matl->addReference();
 
 	t->requires(Task::OldDW, lb->pXLabel, particle_ghost_type, particle_ghost_layer);
-	//t->requires(Task::OldDW, lb->pMassLabel, particle_ghost_type, particle_ghost_layer);
+	t->requires(Task::OldDW, lb->pMassLabel, particle_ghost_type, particle_ghost_layer);
 	t->requires(Task::OldDW, lb->pDispLabel, particle_ghost_type, particle_ghost_layer);
 	t->requires(Task::OldDW, lb->pVolumeLabel, particle_ghost_type, particle_ghost_layer);
 
@@ -1951,6 +1958,7 @@ void DOUBLEMPM::scheduleComputeNormals_DOUBLEMPM(SchedulerP   & sched,
 	t->requires(Task::OldDW, lb->NC_CCweightLabel, z_matl, Ghost::None);
 
 	t->requires(Task::OldDW, double_lb->pMassSolidLabel, particle_ghost_type, particle_ghost_layer);
+	t->requires(Task::OldDW, double_lb->pMassLiquidLabel, particle_ghost_type, particle_ghost_layer);
 
 	t->computes(lb->gSurfNormLabel);
 	t->computes(lb->gStressLabel);
@@ -2016,14 +2024,15 @@ void DOUBLEMPM::computeNormals_DOUBLEMPM(const ProcessorGroup *,
 
 			constParticleVariable<Point> px;
 			constParticleVariable<Vector> pdisp;
-			constParticleVariable<double> pMassSolid, pvolume;
+			constParticleVariable<double> pmass, pMassSolid, pMassLiquid, pvolume;
 			constParticleVariable<Matrix3> psize, pstress;
 			//constParticleVariable<Matrix3> deformationGradient;
 
 			old_dw->get(px, lb->pXLabel, pset);
 			old_dw->get(pdisp, lb->pDispLabel, pset);
-			//old_dw->get(pmass, lb->pMassLabel, pset);
+			old_dw->get(pmass, lb->pMassLabel, pset);
 			old_dw->get(pMassSolid, double_lb->pMassSolidLabel, pset);
+			old_dw->get(pMassLiquid, double_lb->pMassLiquidLabel, pset);
 			old_dw->get(pvolume, lb->pVolumeLabel, pset);
 
 			new_dw->get(psize, lb->pCurSizeLabel, pset);
@@ -2038,20 +2047,36 @@ void DOUBLEMPM::computeNormals_DOUBLEMPM(const ProcessorGroup *,
 			gnormtraction[m].initialize(0.0);
 			gstress[m].initialize(Matrix3(0.0));
 
+			string particleType = mpm_matl->getParticleType();
 			int NN = flags->d_8or27;
+
 			if (flags->d_axisymmetric) {
 				for (ParticleSubset::iterator it = pset->begin(); it != pset->end(); it++) {
 					particleIndex idx = *it;
 
 					NN = interpolator->findCellAndWeightsAndShapeDerivatives(
 						px[idx], ni, S, d_S, psize[idx]);
-					double rho = pMassSolid[idx] / pvolume[idx];
+
+					double mass = 0;
+
+					// Solid
+					if (particleType == "structure") {
+						mass = pmass[idx];
+					}
+					else if (particleType == "solid") {
+						mass = pMassSolid[idx];
+					}
+					else if (particleType == "liquid") {
+						mass = pMassLiquid[idx];
+					}
+
+					double rho = mass / pvolume[idx];
 					for (int k = 0; k < NN; k++) {
 						if (patch->containsNode(ni[k])) {
 							Vector G(d_S[k].x(), d_S[k].y(), 0.0);
 							gsurfnorm[m][ni[k]] += rho * G;
-							gposition[m][ni[k]] += px[idx].asVector()*pMassSolid[idx] * S[k];
-							gdisp[m][ni[k]] += pdisp[idx] * pMassSolid[idx] * S[k];
+							gposition[m][ni[k]] += px[idx].asVector()* mass * S[k];
+							gdisp[m][ni[k]] += pdisp[idx] * mass * S[k];
 							gstress[m][ni[k]] += pstress[idx] * S[k];
 						}
 					}
@@ -2063,16 +2088,32 @@ void DOUBLEMPM::computeNormals_DOUBLEMPM(const ProcessorGroup *,
 
 					NN = interpolator->findCellAndWeightsAndShapeDerivatives(
 						px[idx], ni, S, d_S, psize[idx]);
+
+					double mass = 0;
+
+					// Solid
+					if (particleType == "structure") {
+						mass = pmass[idx];
+					}
+					else if (particleType == "solid") {
+						mass = pMassSolid[idx];
+					}
+					else if (particleType == "liquid") {
+						mass = pMassLiquid[idx];
+					}
+
 					for (int k = 0; k < NN; k++) {
 						if (patch->containsNode(ni[k])) {
 							Vector grad(d_S[k].x()*oodx[0], d_S[k].y()*oodx[1],
 								d_S[k].z()*oodx[2]);
-							gsurfnorm[m][ni[k]] += pMassSolid[idx] * grad;
-							gposition[m][ni[k]] += px[idx].asVector()*pMassSolid[idx] * S[k];
-							gdisp[m][ni[k]] += pdisp[idx] * pMassSolid[idx] * S[k];
+							gsurfnorm[m][ni[k]] += mass * grad;
+							gposition[m][ni[k]] += px[idx].asVector()* mass * S[k];
+							gdisp[m][ni[k]] += pdisp[idx] * mass * S[k];
 							gstress[m][ni[k]] += pstress[idx] * S[k];
 						}
 					}
+
+					
 				}
 			} // axisymmetric conditional
 		}   // matl loop
@@ -2496,7 +2537,7 @@ void DOUBLEMPM::computeInternalForce_DOUBLEMPM(const ProcessorGroup*,
 					} // End particle loop
 				}
 
-				if (particleType == "solid") {
+				if (particleType == "solid" || particleType == "structure") {
 					for (ParticleSubset::iterator iter = pset->begin();
 						iter != pset->end();
 						iter++) {
@@ -2875,7 +2916,6 @@ void DOUBLEMPM::computeAndIntegrateAcceleration_DOUBLEMPM(const ProcessorGroup*,
 					Vector GradientVelocity(0., 0., 0.);
 
 					gPorosity[c] = 1 - (gMassSolid[c] / (psp * gvolume[c]));
-					//cerr  <<"solid" << gPorosity[c] << endl;
 
 					if (gmassglobalLiquid[c] > flags->d_min_mass_for_acceleration) {			
 						GradientVelocity = gvelglobalLiquid[c] - velocity[c];
@@ -2890,7 +2930,24 @@ void DOUBLEMPM::computeAndIntegrateAcceleration_DOUBLEMPM(const ProcessorGroup*,
 					acceleration[c] = acc + gravity;
 					velocity_star[c] = velocity[c] + acceleration[c] * delT;
 					gvelglobalnew[c] += velocity_star[c];
-					//cerr << acceleration[c] << endl;
+				}
+			}
+
+			if (particleType == "structure") {
+
+				for (NodeIterator iter = patch->getExtraNodeIterator();
+					!iter.done(); iter++) {
+					IntVector c = *iter;
+
+					Vector acc(0., 0., 0.);
+
+					if (gMassSolid[c] > flags->d_min_mass_for_acceleration) {
+						acc = (internalforce[c] + externalforce[c]) / gMassSolid[c];
+						acc -= damp_coef * velocity[c];
+					}
+					acceleration[c] = acc + gravity;
+					velocity_star[c] = velocity[c] + acceleration[c] * delT;
+					gvelglobalnew[c] += velocity_star[c];
 				}
 
 			}
@@ -3969,7 +4026,7 @@ void DOUBLEMPM::interpolateToParticlesAndUpdate_DOUBLEMPM(const ProcessorGroup*,
 					}
 				}
 			
-				if (particleType == "solid") {
+				if (particleType == "solid" || particleType == "structure") {
 					for (ParticleSubset::iterator iter = pset->begin();
 						iter != pset->end(); iter++) {
 						particleIndex idx = *iter;
@@ -4078,7 +4135,7 @@ void DOUBLEMPM::interpolateToParticlesAndUpdate_DOUBLEMPM(const ProcessorGroup*,
 					}
 				}
 
-				if (particleType == "solid") {
+				if (particleType == "solid" || particleType == "structure") {
 					for (ParticleSubset::iterator iter = pset->begin();
 						iter != pset->end(); iter++) {
 						particleIndex idx = *iter;
@@ -4108,14 +4165,21 @@ void DOUBLEMPM::interpolateToParticlesAndUpdate_DOUBLEMPM(const ProcessorGroup*,
 						}
 
 						// Fix solid particles
-						pxnew[idx] = px[idx];
+						//pxnew[idx] = px[idx];
 
 						// Update the particle's pos and vel using std "FLIP" method
-						//pxnew[idx] = px[idx] + vel * delT;
+						pxnew[idx] = px[idx] + vel * delT;
 						pdispnew[idx] = pdisp[idx] + vel * delT;
 						pvelnew[idx] = pvelocity[idx] + acc * delT;
-						pvelLiquidnew[idx] = 0;
-						
+
+						if (particleType == "solid") {
+							pvelLiquidnew[idx] = 0;
+						}
+						if (particleType == "structure") {
+							pvelLiquidnew[idx] = pvelnew[idx];
+
+						}
+
 						pTempNew[idx] = pTemperature[idx] + tempRate * delT;
 						pTempPreNew[idx] = pTemperature[idx]; // for thermal stress
 						pMassSolidNew[idx] = Max(pMassSolid[idx] * (1. - burnFraction), 0.);
@@ -4132,7 +4196,7 @@ void DOUBLEMPM::interpolateToParticlesAndUpdate_DOUBLEMPM(const ProcessorGroup*,
 			// Default for d_max_vel is 3.e105, hence the conditional
 			if (flags->d_max_vel < 1.e105) {
 
-				if (particleType == "solid") {
+				if (particleType == "solid" || particleType == "structure") {
 
 					for (ParticleSubset::iterator iter = pset->begin();
 						iter != pset->end(); iter++) {
@@ -4470,7 +4534,7 @@ void DOUBLEMPM::computeParticleGradientsAndPorePressure_DOUBLEMPM(const Processo
 				}		
 			}
 
-			if (particleType == "solid") {
+			if (particleType == "solid" || particleType == "structure") {
 					for (ParticleSubset::iterator iter = pset->begin();
 					iter != pset->end(); iter++) {
 					particleIndex idx = *iter;
@@ -4708,7 +4772,7 @@ void DOUBLEMPM::computeStressTensor(const ProcessorGroup*,
 		Matrix3 Identity;
 		Identity.Identity();
 
-		if (particleType == "solid") {
+		if (particleType == "solid" || particleType == "structure") {
 
 			if (cout_dbg.active())
 				cout_dbg << " MPM_Mat = " << mpm_matl;

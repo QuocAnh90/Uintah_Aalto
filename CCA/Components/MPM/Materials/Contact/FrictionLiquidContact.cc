@@ -34,9 +34,10 @@
 #include <Core/Grid/Task.h>
 #include <Core/Grid/Variables/VarTypes.h>
 #include <CCA/Components/MPM/Core/MPMLabel.h>
+#include <CCA/Components/MPM/Core/DOUBLEMPMLabel.h>
 #include <CCA/Ports/DataWarehouse.h>
 #include <CCA/Components/MPM/Materials/MPMMaterial.h>
-#include <CCA/Components/MPM/Materials/Contact/FrictionContact.h>
+#include <CCA/Components/MPM/Materials/Contact/FrictionLiquidContact.h>
 #include <vector>
 #include <iostream>
 
@@ -47,7 +48,7 @@ using std::string;
 using namespace std;
 
 
-FrictionContact::FrictionContact(const ProcessorGroup* myworld,
+FrictionLiquidContact::FrictionLiquidContact(const ProcessorGroup* myworld,
                                  ProblemSpecP& ps,MaterialManagerP& d_sS,
                                  MPMLabel* Mlb,MPMFlags* MFlag)
   : Contact(myworld, Mlb, MFlag, ps)
@@ -73,15 +74,15 @@ FrictionContact::FrictionContact(const ProcessorGroup* myworld,
   }
 }
 
-FrictionContact::~FrictionContact()
+FrictionLiquidContact::~FrictionLiquidContact()
 {
   // Destructor
 }
 
-void FrictionContact::outputProblemSpec(ProblemSpecP& ps)
+void FrictionLiquidContact::outputProblemSpec(ProblemSpecP& ps)
 {
   ProblemSpecP contact_ps = ps->appendChild("contact");
-  contact_ps->appendElement("type","friction");
+  contact_ps->appendElement("type","frictionliquid");
   contact_ps->appendElement("mu",                d_mu);
   contact_ps->appendElement("volume_constraint", d_vol_const);
   contact_ps->appendElement("separation_factor", d_sepFac);
@@ -89,7 +90,7 @@ void FrictionContact::outputProblemSpec(ProblemSpecP& ps)
   d_matls.outputProblemSpec(contact_ps);
 }
 
-void FrictionContact::exMomInterpolated(const ProcessorGroup*,
+void FrictionLiquidContact::exMomInterpolated(const ProcessorGroup*,
                                         const PatchSubset* patches,
                                         const MaterialSubset* matls,
                                         DataWarehouse* old_dw,
@@ -106,7 +107,8 @@ void FrictionContact::exMomInterpolated(const ProcessorGroup*,
    std::vector<constNCVariable<Point> >   gposition(numMatls);
    std::vector<constNCVariable<Vector> >  gsurfnorm(numMatls);
    std::vector<constNCVariable<double> >  gnormtraction(numMatls);
-   std::vector<NCVariable<Vector> >       gvelocity(numMatls);
+   //std::vector<NCVariable<Vector> >       gvelocity(numMatls);
+   std::vector<NCVariable<Vector> >       gvelocityLiquid(numMatls);
    std::vector<NCVariable<double> >       frictionWork(numMatls);
 
    Ghost::GhostType  gnone = Ghost::None;
@@ -131,7 +133,8 @@ void FrictionContact::exMomInterpolated(const ProcessorGroup*,
       new_dw->get(gposition[m],      lb->gPositionLabel, dwi, patch, gnone, 0);
       new_dw->get(gnormtraction[m],  lb->gNormTractionLabel,
                                                          dwi, patch, gnone, 0);
-      new_dw->getModifiable(gvelocity[m],   lb->gVelocityLabel,      dwi,patch);
+      //new_dw->getModifiable(gvelocity[m],   lb->gVelocityLabel,      dwi,patch);
+	  new_dw->getModifiable(gvelocityLiquid[m], double_lb->gVelocityLiquidLabel, dwi, patch);
       new_dw->getModifiable(frictionWork[m],lb->frictionalWorkLabel, dwi,patch);
     }  // loop over matls
 
@@ -144,7 +147,7 @@ void FrictionContact::exMomInterpolated(const ProcessorGroup*,
       double totalNodalVol=0.0; 
       for(int n = 0; n < numMatls; n++){
         if(!d_matls.requested(n)) continue;
-        centerOfMassMom+=gvelocity[n][c] * gmass[n][c];
+        centerOfMassMom+= gvelocityLiquid[n][c] * gmass[n][c];
         centerOfMassPos+=gposition[n][c].asVector() * gmass[n][c];
         centerOfMassMass+= gmass[n][c]; 
         totalNodalVol+=gvolume[n][c]*8.0*NC_CCweight[c];
@@ -198,7 +201,7 @@ void FrictionContact::exMomInterpolated(const ProcessorGroup*,
           for(int n = 0; n < numMatls; n++){
             if(!d_matls.requested(n)) continue;
             double mass=gmass[n][c];
-            Vector deltaVelocity=gvelocity[n][c]-centerOfMassVelocity;
+            Vector deltaVelocity= gvelocityLiquid[n][c]-centerOfMassVelocity;
             if(!compare(mass/centerOfMassMass,0.0)
             && !compare(mass-centerOfMassMass,0.0)){
 
@@ -265,7 +268,7 @@ void FrictionContact::exMomInterpolated(const ProcessorGroup*,
                   Dv=Dv*ff;
                 }
                 Dv=scale_factor*Dv;
-                gvelocity[n][c]+=Dv;
+				gvelocityLiquid[n][c]+=Dv;
                }  // if traction
               }   // if sepscal
             }    // if !compare && !compare
@@ -277,7 +280,7 @@ void FrictionContact::exMomInterpolated(const ProcessorGroup*,
  }   // if d_oneOrTwoStep
 }
 
-void FrictionContact::exMomIntegrated(const ProcessorGroup*,
+void FrictionLiquidContact::exMomIntegrated(const ProcessorGroup*,
                                       const PatchSubset* patches,
                                       const MaterialSubset* matls,
                                       DataWarehouse* old_dw,
@@ -293,7 +296,8 @@ void FrictionContact::exMomIntegrated(const ProcessorGroup*,
   std::vector<constNCVariable<double> > gmass(numMatls);
   std::vector<constNCVariable<double> > gvolume(numMatls);
   std::vector<constNCVariable<Point> >  gposition(numMatls);
-  std::vector<NCVariable<Vector> >      gvelocity_star(numMatls);
+  //std::vector<NCVariable<Vector> >      gvelocity_star(numMatls);
+  std::vector<NCVariable<Vector> >       gvelocityLiquid_star(numMatls);
   std::vector<constNCVariable<double> > normtraction(numMatls);
   std::vector<NCVariable<double> >      frictionWork(numMatls);
   std::vector<constNCVariable<Vector> > gsurfnorm(numMatls);    
@@ -313,8 +317,10 @@ void FrictionContact::exMomIntegrated(const ProcessorGroup*,
       new_dw->get(gsurfnorm[m],   lb->gSurfNormLabel,    dwi, patch, gnone, 0);
       new_dw->get(gposition[m],   lb->gPositionLabel,    dwi, patch, gnone, 0);
       new_dw->get(gvolume[m],     lb->gVolumeLabel,      dwi, patch, gnone, 0);
-      new_dw->getModifiable(gvelocity_star[m], lb->gVelocityStarLabel,
-                            dwi, patch);
+      //new_dw->getModifiable(gvelocity_star[m], lb->gVelocityStarLabel,
+      //                      dwi, patch);
+	  new_dw->getModifiable(gvelocityLiquid_star[m], double_lb->gVelocityStarLiquidLabel, 
+							dwi, patch);
       new_dw->getModifiable(frictionWork[m], lb->frictionalWorkLabel,
                             dwi, patch);
     }
@@ -334,7 +340,7 @@ void FrictionContact::exMomIntegrated(const ProcessorGroup*,
       for(int  n = 0; n < numMatls; n++){
         if(!d_matls.requested(n)) continue;
         double mass = gmass[n][c];
-        centerOfMassMom+=gvelocity_star[n][c] * mass;
+        centerOfMassMom+= gvelocityLiquid_star[n][c] * mass;
         centerOfMassPos+=gposition[n][c].asVector() * gmass[n][c];
         centerOfMassMass+= mass; 
         totalNodalVol+=gvolume[n][c]*8.0*NC_CCweight[c];
@@ -387,7 +393,7 @@ void FrictionContact::exMomIntegrated(const ProcessorGroup*,
           // field is contributing to grid vertex).
           for(int n = 0; n < numMatls; n++){
             if(!d_matls.requested(n)) continue;
-            Vector deltaVelocity=gvelocity_star[n][c]-centerOfMassVelocity;
+            Vector deltaVelocity= gvelocityLiquid_star[n][c]-centerOfMassVelocity;
             double mass = gmass[n][c];
             if(!compare(mass/centerOfMassMass,0.0)
             && !compare(mass-centerOfMassMass,0.0)){
@@ -459,7 +465,7 @@ void FrictionContact::exMomIntegrated(const ProcessorGroup*,
                   Dv=Dv*ff;
                 }
                 Dv=scale_factor*Dv;
-                gvelocity_star[n][c]+=Dv;
+				gvelocityLiquid_star[n][c]+=Dv;
               } // traction
              }  // if sepscal
             }   // if !compare && !compare
@@ -498,12 +504,12 @@ void FrictionContact::exMomIntegrated(const ProcessorGroup*,
   }
 }
 
-void FrictionContact::addComputesAndRequiresInterpolated(SchedulerP & sched,
+void FrictionLiquidContact::addComputesAndRequiresInterpolated(SchedulerP & sched,
                                                         const PatchSet* patches,
                                                         const MaterialSet* ms)
 {
-  Task * t = scinew Task("Friction::exMomInterpolated", 
-                      this, &FrictionContact::exMomInterpolated);
+  Task * t = scinew Task("FrictionLiquidContact::exMomInterpolated", 
+                      this, &FrictionLiquidContact::exMomInterpolated);
 
   MaterialSubset* z_matl = scinew MaterialSubset();
   z_matl->add(0);
@@ -518,7 +524,8 @@ void FrictionContact::addComputesAndRequiresInterpolated(SchedulerP & sched,
   t->requires(Task::NewDW, lb->gNormTractionLabel,       Ghost::None);
   t->requires(Task::OldDW, lb->NC_CCweightLabel,z_matl,  Ghost::None);
   t->modifies(lb->frictionalWorkLabel, mss);
-  t->modifies(lb->gVelocityLabel,      mss);
+  //t->modifies(lb->gVelocityLabel,      mss);
+  t->modifies(double_lb->gVelocityLiquidLabel, mss);
 
   sched->addTask(t, patches, ms);
 
@@ -526,12 +533,12 @@ void FrictionContact::addComputesAndRequiresInterpolated(SchedulerP & sched,
     delete z_matl; // shouln't happen, but...
 }
 
-void FrictionContact::addComputesAndRequiresIntegrated(SchedulerP & sched,
+void FrictionLiquidContact::addComputesAndRequiresIntegrated(SchedulerP & sched,
                                                        const PatchSet* patches,
                                                        const MaterialSet* ms) 
 {
-  Task * t = scinew Task("Friction::exMomIntegrated", 
-                      this, &FrictionContact::exMomIntegrated);
+  Task * t = scinew Task("FrictionLiquidContact::exMomIntegrated", 
+                      this, &FrictionLiquidContact::exMomIntegrated);
 
   MaterialSubset* z_matl = scinew MaterialSubset();
   z_matl->add(0);
@@ -545,9 +552,9 @@ void FrictionContact::addComputesAndRequiresIntegrated(SchedulerP & sched,
   t->requires(Task::NewDW, lb->gMassLabel,             Ghost::None);
   t->requires(Task::NewDW, lb->gVolumeLabel,           Ghost::None);
   t->requires(Task::NewDW, lb->gPositionLabel,         Ghost::None);
-  t->modifies(             lb->gVelocityStarLabel,  mss);
+  //t->modifies(             lb->gVelocityStarLabel,  mss);
   t->modifies(             lb->frictionalWorkLabel, mss);
-
+  t->modifies(double_lb->gVelocityStarLiquidLabel, mss);
   sched->addTask(t, patches, ms);
 
   if (z_matl->removeReference())

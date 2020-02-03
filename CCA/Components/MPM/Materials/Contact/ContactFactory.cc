@@ -26,6 +26,7 @@
 #include <CCA/Components/MPM/Materials/Contact/NullContact.h>
 #include <CCA/Components/MPM/Materials/Contact/SingleVelContact.h>
 #include <CCA/Components/MPM/Materials/Contact/FrictionContact.h>
+#include <CCA/Components/MPM/Materials/Contact/FrictionLiquidContact.h>
 #include <CCA/Components/MPM/Materials/Contact/NodalSVFContact.h>
 #include <CCA/Components/MPM/Materials/Contact/SpecifiedBodyContact.h>
 #include <CCA/Components/MPM/Materials/Contact/ApproachContact.h>
@@ -73,12 +74,16 @@ Contact* ContactFactory::create(const ProcessorGroup* myworld,
        contact_list->add(scinew FrictionContact(myworld,child,ss,lb,flag));
        needNormals=true;
      }
+	 else if (con_type == "frictionliquid") {
+		 contact_list->add(scinew FrictionLiquidContact(myworld, child, ss, lb, flag));
+		 needNormals = true;
+	 }
      else if (con_type == "approach") {
        contact_list->add(scinew ApproachContact(myworld,child,ss,lb,flag));
        needNormals=true;
      }
      else if (con_type == "specified_velocity" || con_type == "specified" || con_type == "rigid"  ) {
-       contact_list->add( scinew SpecifiedBodyContact( myworld, child, ss, lb, flag ) );
+       contact_list->add(scinew SpecifiedBodyContact( myworld, child, ss, lb, flag ) );
        needNormals=true;
      }
      else {

@@ -22,36 +22,33 @@
  * IN THE SOFTWARE.
  */
 
-#ifndef __CONTACT_H__
-#define __CONTACT_H__
+// FrictionLiquid.h
 
-#include <CCA/Components/MPM/Materials/Contact/ContactMaterialSpec.h>
-#include <Core/Grid/Variables/ComputeSet.h>
-#include <CCA/Ports/Scheduler.h>
-#include <CCA/Ports/SchedulerP.h>
-#include <cmath>
+#ifndef __FRICTION_LIQUID_H__
+#define __FRICTION_LIQUID_H__
+
+#include <CCA/Components/MPM/Materials/Contact/Contact.h>
+#include <CCA/Components/MPM/Materials/Contact/ContactMaterialSpec.h> 
+#include <CCA/Components/MPM/Core/MPMFlags.h>
+#include <CCA/Ports/DataWarehouseP.h>
+#include <Core/ProblemSpec/ProblemSpecP.h>
+#include <Core/ProblemSpec/ProblemSpec.h>
+#include <Core/Grid/GridP.h>
+#include <Core/Grid/LevelP.h>
+#include <Core/Grid/MaterialManagerP.h>
+
 
 namespace Uintah {
-
-  class DataWarehouse;
-  class MPMLabel;
-  class DOUBLEMPMLabel;
-  class MPMFlags;
-  class ProcessorGroup;
-  class Patch;
-  class VarLabel;
-  class Task;
-
 /**************************************
 
 CLASS
-   Contact
+   FrictionLiquidContact
    
    Short description...
 
 GENERAL INFORMATION
 
-   Contact.h
+   FrictionLiquidContact.h
 
    Steven G. Parker
    Department of Computer Science
@@ -61,59 +58,66 @@ GENERAL INFORMATION
   
 
 KEYWORDS
-   Contact_Model
+   Contact_Model_Friction
 
 DESCRIPTION
-   Long description...
+  One of the derived Contact classes.  This particular
+  version is used to apply Coulombic frictional contact.
   
 WARNING
-
+  
 ****************************************/
 
-  class Contact {
+      class FrictionLiquidContact : public Contact {
+      private:
+         
+         // Prevent copying of this class
+         // copy constructor
+		  FrictionLiquidContact(const FrictionLiquidContact &con);
+		  FrictionLiquidContact& operator=(const FrictionLiquidContact &con);
+         
+         MaterialManagerP    d_materialManager;
+         
+         // Coefficient of friction
+         double d_mu;
+         // Nodal volume fraction that must occur before contact is applied
+         double d_vol_const;
+         double d_sepFac;
+         int NGP;
+         int NGN;
+
       public:
          // Constructor
-         Contact(const ProcessorGroup* myworld, MPMLabel* Mlb, MPMFlags* MFlag,
-                 ProblemSpecP ps);
-         virtual ~Contact();
+		  FrictionLiquidContact(const ProcessorGroup* myworld,
+                         ProblemSpecP& ps, MaterialManagerP& d_sS,MPMLabel* lb,
+                         MPMFlags* MFlag);
+         
+         // Destructor
+         virtual ~FrictionLiquidContact();
 
-         virtual void outputProblemSpec(ProblemSpecP& ps) = 0;
+         virtual void outputProblemSpec(ProblemSpecP& ps);
 
          // Basic contact methods
          virtual void exMomInterpolated(const ProcessorGroup*,
                                         const PatchSubset* patches,
                                         const MaterialSubset* matls,
                                         DataWarehouse* old_dw,
-                                        DataWarehouse* new_dw) = 0;
+                                        DataWarehouse* new_dw);
          
          virtual void exMomIntegrated(const ProcessorGroup*,
                                       const PatchSubset* patches,
                                       const MaterialSubset* matls,
                                       DataWarehouse* old_dw,
-                                      DataWarehouse* new_dw) = 0;
+                                      DataWarehouse* new_dw);
          
          virtual void addComputesAndRequiresInterpolated(SchedulerP & sched,
-                                      const PatchSet* patches,
-                                      const MaterialSet* matls) = 0;
-         
-         virtual void addComputesAndRequiresIntegrated(SchedulerP & sched,
-                                      const PatchSet* patches,
-                                      const MaterialSet* matls) = 0;
-      protected:
-         MPMLabel* lb;
-		 DOUBLEMPMLabel* double_lb;
-         MPMFlags* flag;
-         int    d_oneOrTwoStep;
-         
-         ContactMaterialSpec d_matls;
-      };
-      
-      inline bool compare(double num1, double num2) {
-            //double EPSILON=1.e-20;
-            double EPSILON=1.e-14;
-            return (fabs(num1-num2) <= EPSILON);
-      }
+                                             const PatchSet* patches,
+                                             const MaterialSet* matls);
 
+         virtual void addComputesAndRequiresIntegrated(SchedulerP & sched,
+                                             const PatchSet* patches,
+                                             const MaterialSet* matls);
+      };
 } // End namespace Uintah
 
-#endif // __CONTACT_H__
+#endif /* __FRICTION_LIQUID_H__ */
