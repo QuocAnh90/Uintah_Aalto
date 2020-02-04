@@ -134,7 +134,7 @@ void FrictionLiquidContact::exMomInterpolated(const ProcessorGroup*,
       new_dw->get(gnormtraction[m],  lb->gNormTractionLabel,
                                                          dwi, patch, gnone, 0);
       //new_dw->getModifiable(gvelocity[m],   lb->gVelocityLabel,      dwi,patch);
-	  new_dw->getModifiable(gvelocityLiquid[m], double_lb->gVelocityLiquidLabel, dwi, patch);
+	  new_dw->getModifiable(gvelocityLiquid[m], lb->gVelocityLiquidLabel, dwi, patch);
       new_dw->getModifiable(frictionWork[m],lb->frictionalWorkLabel, dwi,patch);
     }  // loop over matls
 
@@ -319,7 +319,7 @@ void FrictionLiquidContact::exMomIntegrated(const ProcessorGroup*,
       new_dw->get(gvolume[m],     lb->gVolumeLabel,      dwi, patch, gnone, 0);
       //new_dw->getModifiable(gvelocity_star[m], lb->gVelocityStarLabel,
       //                      dwi, patch);
-	  new_dw->getModifiable(gvelocityLiquid_star[m], double_lb->gVelocityStarLiquidLabel, 
+	  new_dw->getModifiable(gvelocityLiquid_star[m], lb->gVelocityStarLiquidLabel, 
 							dwi, patch);
       new_dw->getModifiable(frictionWork[m], lb->frictionalWorkLabel,
                             dwi, patch);
@@ -525,7 +525,7 @@ void FrictionLiquidContact::addComputesAndRequiresInterpolated(SchedulerP & sche
   t->requires(Task::OldDW, lb->NC_CCweightLabel,z_matl,  Ghost::None);
   t->modifies(lb->frictionalWorkLabel, mss);
   //t->modifies(lb->gVelocityLabel,      mss);
-  t->modifies(double_lb->gVelocityLiquidLabel, mss);
+  t->modifies(lb->gVelocityLiquidLabel, mss);
 
   sched->addTask(t, patches, ms);
 
@@ -554,7 +554,7 @@ void FrictionLiquidContact::addComputesAndRequiresIntegrated(SchedulerP & sched,
   t->requires(Task::NewDW, lb->gPositionLabel,         Ghost::None);
   //t->modifies(             lb->gVelocityStarLabel,  mss);
   t->modifies(             lb->frictionalWorkLabel, mss);
-  t->modifies(double_lb->gVelocityStarLiquidLabel, mss);
+  t->modifies(lb->gVelocityStarLiquidLabel, mss);
   sched->addTask(t, patches, ms);
 
   if (z_matl->removeReference())

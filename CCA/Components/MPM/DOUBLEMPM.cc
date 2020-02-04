@@ -2881,25 +2881,6 @@ void DOUBLEMPM::computeAndIntegrateAcceleration_DOUBLEMPM(const ProcessorGroup*,
 		new_dw->allocateAndPut(gvelglobalLiquidnew, lb->gVelocityStarLiquidLabel, globMatID, patch);
 		gvelglobalLiquidnew.initialize(Vector(0.0));
 
-		/*
-		NCVariable<double>       gPorosity;
-		NCVariable<Vector>       gVelocityMix;
-		new_dw->allocateAndPut(gPorosity, double_lb->gPorosityLabel, globMatID, patch);
-		new_dw->allocateAndPut(gVelocityMix, double_lb->gVelocityMixLabel, globMatID, patch);
-		double psp = mpm_matl->getInitialDensity();
-		for (NodeIterator iter = patch->getNodeIterator(); !iter.done(); iter++) {
-			IntVector c = *iter;
-			if (gmassglobalSolid[c] > flags->d_min_mass_for_acceleration) {
-				gPorosity[c] = 1 - gmassglobalSolid[c] / (psp * gvolumeglobal[c]);
-				gVelocityMix[c] = ((1 - gPorosity[c]) * gvelglobalLiquid[c]) - (gPorosity[c] * gvelglobal[c]);
-			}
-			else {
-				gPorosity[c] = 1; 
-				gVelocityMix[c] = gvelglobalLiquid[c];
-			}
-		}
-		*/
-
 		for (unsigned int m = 0; m < m_materialManager->getNumMatls("MPM"); m++) {
 			MPMMaterial* mpm_matl = (MPMMaterial*)m_materialManager->getMaterial("MPM", m);
 			int dwi = mpm_matl->getDWIndex();
@@ -2943,7 +2924,6 @@ void DOUBLEMPM::computeAndIntegrateAcceleration_DOUBLEMPM(const ProcessorGroup*,
 			gVelocityStarLiquid.initialize(Vector(0., 0., 0.));
 
 			NCVariable<double> gPorosity;
-			//new_dw->allocateTemporary(gPorosity, patch, gnone, 0);
 			new_dw->allocateAndPut(gPorosity, double_lb->gPorosityLabel, dwi, patch);
 			gPorosity.initialize(1.0);
 
@@ -3000,7 +2980,6 @@ void DOUBLEMPM::computeAndIntegrateAcceleration_DOUBLEMPM(const ProcessorGroup*,
 
 					if (gMassSolid[c] > flags->d_min_mass_for_acceleration) {
 						acc = (internalforce[c] + externalforce[c] + (1 - gPorosity[c]) * gInternalForceglobalLiquid[c] + gPorosity[c] * DraggingForce) / gMassSolid[c];
-						//acc = (internalforce[c] + externalforce[c]) / gMassSolid[c];
 						acc -= damp_coef * velocity[c];
 					}
 					acceleration[c] = acc + gravity;
