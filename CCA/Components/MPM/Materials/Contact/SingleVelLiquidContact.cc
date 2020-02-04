@@ -149,7 +149,7 @@ void SingleVelLiquidContact::exMomIntegrated(const ProcessorGroup*,
      int dwi = matls->get(m);
      new_dw->get(gmass[m],lb->gMassLabel, dwi, patch, Ghost::None, 0);
      //new_dw->getModifiable(gvelocity_star[m],lb->gVelocityStarLabel, dwi,patch);
-	 new_dw->getModifiable(gvelocityLiquid_star[m], double_lb->gVelocityStarLiquidLabel,
+	 new_dw->getModifiable(gvelocityLiquid_star[m], lb->gVelocityStarLiquidLabel,
 		 dwi, patch);
     }
 
@@ -159,7 +159,7 @@ void SingleVelLiquidContact::exMomIntegrated(const ProcessorGroup*,
     for(NodeIterator iter = patch->getNodeIterator(); !iter.done(); iter++){
       IntVector c = *iter;
 
-      centerOfMassMom=zero;
+      centerOfMassMom=0.0;
       centerOfMassMass=0.0; 
       for(int  n = 0; n < numMatls; n++){
         if(d_matls.requested(n)) {
@@ -208,6 +208,6 @@ void SingleVelLiquidContact::addComputesAndRequiresIntegrated(SchedulerP & sched
   t->requires(Task::NewDW, lb->gMassLabel,              Ghost::None);
 
   //t->modifies(lb->gVelocityStarLabel, mss);
-  t->modifies(double_lb->gVelocityStarLiquidLabel, mss);
+  t->modifies(lb->gVelocityStarLiquidLabel, mss);
   sched->addTask(t, patches, ms);
 }

@@ -164,6 +164,7 @@ namespace Uintah {
 		const VarLabel* gAccelerationLabel;
 		const VarLabel* gVelocityLabel;
 		const VarLabel* gVelocityLiquidLabel;
+		const VarLabel* gVelocityStarLiquidLabel;
 
 		const VarLabel* gVelocityBCLabel;
 		const VarLabel* gVelSPSSPLabel;

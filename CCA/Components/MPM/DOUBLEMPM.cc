@@ -1010,7 +1010,7 @@ void DOUBLEMPM::scheduleTimeAdvance(const LevelP & level,
 	}
 	
 	//scheduleFrictionLiquidContact(sched, patches, matls);
-	scheduleVelLiquidContact(sched, patches, matls);
+	//scheduleVelLiquidContact(sched, patches, matls);
 
 	scheduleExMomInterpolated(sched, patches, matls);
 	if (d_bndy_traction_faces.size() > 0) {
@@ -1020,7 +1020,7 @@ void DOUBLEMPM::scheduleTimeAdvance(const LevelP & level,
 	scheduleComputeAndIntegrateAcceleration_DOUBLEMPM(sched, patches, matls);
 
 	scheduleExMomIntegrated(sched, patches, matls);
-	scheduleVelLiquidPlusContact(sched, patches, matls);
+	//scheduleVelLiquidPlusContact(sched, patches, matls);
 
 	scheduleSetGridBoundaryConditions_DOUBLEMPM(sched, patches, matls);
 
@@ -2244,9 +2244,6 @@ void DOUBLEMPM::VelLiquidContact(const ProcessorGroup*,
 
 				Vector centerOfMassMom(0, 0, 0);
 				double centerOfMassMass = 0.0;
-
-				
-
 				for (int n = 0; n < numMatls; n++) {
 					//if (d_matls.requested(n)) {
 					centerOfMassMom += gvelocityLiquid[n][c] * gmass[n][c];
@@ -2263,7 +2260,6 @@ void DOUBLEMPM::VelLiquidContact(const ProcessorGroup*,
 				}
 			}
 		}
-	
 }
 
 // Compute contact area of object boundary (for  if(d_bndy_traction_faces.size()>0))
@@ -2821,7 +2817,7 @@ void DOUBLEMPM::scheduleComputeAndIntegrateAcceleration_DOUBLEMPM(SchedulerP& sc
 	t->requires(Task::NewDW, double_lb->gInternalForceLiquidLabel, Ghost::None);
 	t->requires(Task::NewDW, lb->gVelocityLiquidLabel, Ghost::None);
 	t->computes(double_lb->gAccelerationLiquidLabel);
-	t->computes(double_lb->gVelocityStarLiquidLabel);
+	t->computes(lb->gVelocityStarLiquidLabel);
 	t->computes(double_lb->gPorosityLabel);
 	t->computes(double_lb->gVelocityMixLabel);
 
@@ -2831,7 +2827,7 @@ void DOUBLEMPM::scheduleComputeAndIntegrateAcceleration_DOUBLEMPM(SchedulerP& sc
 		Task::OutOfDomain, Ghost::None);
 	t->requires(Task::NewDW, double_lb->gMassLiquidLabel, m_materialManager->getAllInOneMatls(),
 		Task::OutOfDomain, Ghost::None);
-	t->computes(double_lb->gVelocityStarLiquidLabel, m_materialManager->getAllInOneMatls(),
+	t->computes(lb->gVelocityStarLiquidLabel, m_materialManager->getAllInOneMatls(),
 		Task::OutOfDomain);
 
 	//t->requires(Task::NewDW, double_lb->gGradientVelocityLabel, m_materialManager->getAllInOneMatls(),
@@ -2882,7 +2878,7 @@ void DOUBLEMPM::computeAndIntegrateAcceleration_DOUBLEMPM(const ProcessorGroup*,
 			globMatID, patch, Ghost::None, 0);
 		new_dw->get(gInternalForceglobalLiquid, double_lb->gInternalForceLiquidLabel,
 			globMatID, patch, Ghost::None, 0);
-		new_dw->allocateAndPut(gvelglobalLiquidnew, double_lb->gVelocityStarLiquidLabel, globMatID, patch);
+		new_dw->allocateAndPut(gvelglobalLiquidnew, lb->gVelocityStarLiquidLabel, globMatID, patch);
 		gvelglobalLiquidnew.initialize(Vector(0.0));
 
 		/*
@@ -2942,7 +2938,7 @@ void DOUBLEMPM::computeAndIntegrateAcceleration_DOUBLEMPM(const ProcessorGroup*,
 
 			NCVariable<Vector> gAccelerationLiquid, gVelocityStarLiquid;
 			new_dw->allocateAndPut(gAccelerationLiquid, double_lb->gAccelerationLiquidLabel, dwi, patch);
-			new_dw->allocateAndPut(gVelocityStarLiquid, double_lb->gVelocityStarLiquidLabel, dwi, patch);
+			new_dw->allocateAndPut(gVelocityStarLiquid, lb->gVelocityStarLiquidLabel, dwi, patch);
 			gAccelerationLiquid.initialize(Vector(0., 0., 0.));
 			gVelocityStarLiquid.initialize(Vector(0., 0., 0.));
 
@@ -3043,7 +3039,7 @@ void DOUBLEMPM::computeAndIntegrateAcceleration_DOUBLEMPM(const ProcessorGroup*,
 			constNCVariable<double> gPorosity;
 			
 			new_dw->allocateAndPut(gVelocityMix, double_lb->gVelocityMixLabel, dwi, patch);
-			new_dw->get(gVelocityStarLiquid, double_lb->gVelocityStarLiquidLabel, dwi, patch, gnone, 0);
+			new_dw->get(gVelocityStarLiquid, lb->gVelocityStarLiquidLabel, dwi, patch, gnone, 0);
 			gVelocityMix.copyData(gVelocityStarLiquid);
 			new_dw->get(gPorosity, double_lb->gPorosityLabel, dwi, patch, gnone, 0);
 
@@ -3298,7 +3294,7 @@ void DOUBLEMPM::scheduleVelLiquidPlusContact(SchedulerP & sched,
 	t->requires(Task::NewDW, lb->gMassLabel, Ghost::None);
 
 	//t->modifies(lb->gVelocityStarLabel, mss);
-	t->modifies(double_lb->gVelocityStarLiquidLabel, mss);
+	t->modifies(lb->gVelocityStarLiquidLabel, mss);
 	sched->addTask(t, patches, ms);
 }
 
@@ -3327,7 +3323,7 @@ void DOUBLEMPM::VelLiquidPlusContact(const ProcessorGroup*,
 			int dwi = matls->get(m);
 			new_dw->get(gmass[m], lb->gMassLabel, dwi, patch, Ghost::None, 0);
 			//new_dw->getModifiable(gvelocity_star[m],lb->gVelocityStarLabel, dwi,patch);
-			new_dw->getModifiable(gvelocityLiquid_star[m], double_lb->gVelocityStarLiquidLabel,
+			new_dw->getModifiable(gvelocityLiquid_star[m], lb->gVelocityStarLiquidLabel,
 				dwi, patch);
 		}
 
@@ -3383,7 +3379,7 @@ void DOUBLEMPM::scheduleSetGridBoundaryConditions_DOUBLEMPM(SchedulerP& sched,
 
 	// Liquid
 	t->modifies(double_lb->gAccelerationLiquidLabel, mss);
-	t->modifies(double_lb->gVelocityStarLiquidLabel, mss);
+	t->modifies(lb->gVelocityStarLiquidLabel, mss);
 	t->modifies(double_lb->gVelocityMixLabel, mss);
 	t->requires(Task::NewDW, lb->gVelocityLiquidLabel, Ghost::None);
 
@@ -3425,7 +3421,7 @@ void DOUBLEMPM::setGridBoundaryConditions_DOUBLEMPM(const ProcessorGroup*,
 			NCVariable<Vector> gVelocityStarLiquid, gAccelerationLiquid, gVelocityMix;
 			constNCVariable<Vector> gVelocityLiquid;
 			new_dw->getModifiable(gAccelerationLiquid, double_lb->gAccelerationLiquidLabel, dwi, patch);
-			new_dw->getModifiable(gVelocityStarLiquid, double_lb->gVelocityStarLiquidLabel, dwi, patch);
+			new_dw->getModifiable(gVelocityStarLiquid, lb->gVelocityStarLiquidLabel, dwi, patch);
 			new_dw->getModifiable(gVelocityMix, double_lb->gVelocityMixLabel, dwi, patch);
 			new_dw->get(gVelocityLiquid, lb->gVelocityLiquidLabel, dwi, patch,
 				Ghost::None, 0);
@@ -4111,7 +4107,7 @@ void DOUBLEMPM::scheduleInterpolateToParticlesAndUpdate_DOUBLEMPM(SchedulerP& sc
 
 	// Liquid
 	t->requires(Task::NewDW, double_lb->gAccelerationLiquidLabel, gac, NGN);
-	t->requires(Task::NewDW, double_lb->gVelocityStarLiquidLabel, gac, NGN);
+	t->requires(Task::NewDW, lb->gVelocityStarLiquidLabel, gac, NGN);
 	t->requires(Task::OldDW, double_lb->pVelocityLiquidLabel, gnone);
 	t->computes(double_lb->pVelocityLiquidLabel_preReloc);
 
@@ -4302,7 +4298,7 @@ void DOUBLEMPM::interpolateToParticlesAndUpdate_DOUBLEMPM(const ProcessorGroup*,
 			constParticleVariable<Vector> pVelocityLiquid;
 
 			new_dw->get(gAccelerationLiquid, double_lb->gAccelerationLiquidLabel, dwi, patch, gac, NGP);
-			new_dw->get(gVelocityStarLiquid, double_lb->gVelocityStarLiquidLabel, dwi, patch, gac, NGP);
+			new_dw->get(gVelocityStarLiquid, lb->gVelocityStarLiquidLabel, dwi, patch, gac, NGP);
 			old_dw->get(pVelocityLiquid, double_lb->pVelocityLiquidLabel, pset);
 			new_dw->allocateAndPut(pvelLiquidnew, double_lb->pVelocityLiquidLabel_preReloc, pset);
 		
@@ -4661,7 +4657,7 @@ void DOUBLEMPM::scheduleComputeParticleGradientsAndPorePressure_DOUBLEMPM(Schedu
 	t->requires(Task::OldDW, double_lb->pBulkModulLiquidLabel, gnone);
 	t->requires(Task::OldDW, double_lb->pPorePressureLabel, gnone);
 	//t->requires(Task::OldDW, double_lb->pPoreTensorLabel, gnone);
-	t->requires(Task::NewDW, double_lb->gVelocityStarLiquidLabel, gac, NGN);
+	t->requires(Task::NewDW, lb->gVelocityStarLiquidLabel, gac, NGN);
 
 	// MPI?
 	//t->requires(Task::NewDW, double_lb->gVelocityMixLabel, m_materialManager->getAllInOneMatls(),
@@ -4755,7 +4751,7 @@ void DOUBLEMPM::computeParticleGradientsAndPorePressure_DOUBLEMPM(const Processo
 			old_dw->get(pMassLiquid, double_lb->pMassLiquidLabel, pset);
 			//old_dw->get(pPoreTensor, double_lb->pPoreTensorLabel, pset);
 			
-			//new_dw->get(gVelocityStarLiquid, double_lb->gVelocityStarLiquidLabel, dwi, patch, gac, NGP);
+			//new_dw->get(gVelocityStarLiquid, lb->gVelocityStarLiquidLabel, dwi, patch, gac, NGP);
 			new_dw->allocateAndPut(pVelocityGradLiquid, double_lb->pVelocityGradLiquidLabel_preReloc, pset);
 			new_dw->allocateAndPut(pPorePressurenew, double_lb->pPorePressureLabel_preReloc, pset);
 			new_dw->allocateAndPut(pPoreTensornew, double_lb->pPoreTensorLabel_preReloc, pset);
