@@ -25,6 +25,7 @@
 #include <CCA/Components/MPM/Materials/Contact/ContactFactory.h>
 #include <CCA/Components/MPM/Materials/Contact/NullContact.h>
 #include <CCA/Components/MPM/Materials/Contact/SingleVelContact.h>
+#include <CCA/Components/MPM/Materials/Contact/SingleVelLiquidContact.h>
 #include <CCA/Components/MPM/Materials/Contact/FrictionContact.h>
 #include <CCA/Components/MPM/Materials/Contact/FrictionLiquidContact.h>
 #include <CCA/Components/MPM/Materials/Contact/NodalSVFContact.h>
@@ -67,6 +68,9 @@ Contact* ContactFactory::create(const ProcessorGroup* myworld,
      else if (con_type == "single_velocity") {
        contact_list->add(scinew SingleVelContact(myworld,child,ss,lb,flag));
      }
+	 else if (con_type == "single_velocity_liquid") {
+		 contact_list->add(scinew SingleVelLiquidContact(myworld, child, ss, lb, flag));
+	 }
      else if (con_type == "nodal_svf") {
        contact_list->add(scinew NodalSVFContact(myworld,child,ss,lb,flag));
      }
@@ -74,7 +78,7 @@ Contact* ContactFactory::create(const ProcessorGroup* myworld,
        contact_list->add(scinew FrictionContact(myworld,child,ss,lb,flag));
        needNormals=true;
      }
-	 else if (con_type == "frictionliquid") {
+	 else if (con_type == "friction_liquid") {
 		 contact_list->add(scinew FrictionLiquidContact(myworld, child, ss, lb, flag));
 		 needNormals = true;
 	 }

@@ -82,7 +82,7 @@ FrictionLiquidContact::~FrictionLiquidContact()
 void FrictionLiquidContact::outputProblemSpec(ProblemSpecP& ps)
 {
   ProblemSpecP contact_ps = ps->appendChild("contact");
-  contact_ps->appendElement("type","frictionliquid");
+  contact_ps->appendElement("type","friction_liquid");
   contact_ps->appendElement("mu",                d_mu);
   contact_ps->appendElement("volume_constraint", d_vol_const);
   contact_ps->appendElement("separation_factor", d_sepFac);

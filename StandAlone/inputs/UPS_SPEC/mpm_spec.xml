@@ -149,7 +149,7 @@
         <colinear_norms                  spec="OPTIONAL BOOLEAN"/>
         <materials                       spec="OPTIONAL MULTIPLE_INTEGERS" />
         <stop_time                       spec="OPTIONAL DOUBLE" /> <!-- Time at which to make the velocity of the rigid body have the value of velocity_after_stop -->
-        <type                            spec="REQUIRED STRING 'null, nodal_svf, single_velocity, rigid, specified, friction, frictionliquid, approach'" />
+        <type                            spec="REQUIRED STRING 'null, nodal_svf, single_velocity,single_velocity_liquid, rigid, specified, friction, friction_liquid, approach'" />
         <vel_fields                      spec="OPTIONAL MULTIPLE_INTEGERS" />
         <velocity_after_stop             spec="OPTIONAL VECTOR" />
         <filename                        spec="OPTIONAL STRING" />

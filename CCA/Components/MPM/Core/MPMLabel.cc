@@ -815,6 +815,9 @@ MPMLabel::MPMLabel()
 	gNormalRotAccLabel = VarLabel::create("g.normalRotAcc",
 		NCVariable<Vector>::getTypeDescription());
 
+	gVelocityLiquidLabel = VarLabel::create("g.velocityLiquid", 
+		NCVariable<Vector>::getTypeDescription());
+
 	// For Cohesive Zones
 	czAreaLabel = VarLabel::create("cz.area",
 		ParticleVariable<double>::getTypeDescription());
@@ -981,7 +984,8 @@ MPMLabel::~MPMLabel()
 	VarLabel::destroy(gAccelerationEndLabel);
 	VarLabel::destroy(pVoidRatioLabel);
 	VarLabel::destroy(gVoidRatioLabel);
-
+	VarLabel::destroy(gVelocityLiquidLabel);
+	
 	VarLabel::destroy(gAccelerationLabel);
 	VarLabel::destroy(gColorLabel);
 	VarLabel::destroy(gMassLabel);
