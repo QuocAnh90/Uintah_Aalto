@@ -1009,9 +1009,6 @@ void DOUBLEMPM::scheduleTimeAdvance(const LevelP & level,
 		scheduleComputeNormals_DOUBLEMPM(sched, patches, matls);
 	}
 	
-	//scheduleFrictionLiquidContact(sched, patches, matls);
-	//scheduleVelLiquidContact(sched, patches, matls);
-
 	scheduleExMomInterpolated(sched, patches, matls);
 	if (d_bndy_traction_faces.size() > 0) {
 		scheduleComputeContactArea(sched, patches, matls);
@@ -1020,7 +1017,6 @@ void DOUBLEMPM::scheduleTimeAdvance(const LevelP & level,
 	scheduleComputeAndIntegrateAcceleration_DOUBLEMPM(sched, patches, matls);
 
 	scheduleExMomIntegrated(sched, patches, matls);
-	//scheduleVelLiquidPlusContact(sched, patches, matls);
 
 	scheduleSetGridBoundaryConditions_DOUBLEMPM(sched, patches, matls);
 
@@ -1835,10 +1831,10 @@ void DOUBLEMPM::interpolateParticlesToGrid_DOUBLEMPM(const ProcessorGroup*,
 							}
 							else if (particleType == "solid") {
 								gmass[node] += pMassSolid[idx] * S[k];
+								gmassSolid[node] += pMassSolid[idx] * S[k];
 							}
 
-							gvolume[node] += pvolume[idx] * S[k];
-							gmassSolid[node] += pMassSolid[idx] * S[k];
+							gvolume[node] += pvolume[idx] * S[k];					
 							gvelocity[node] += pmom * S[k];
 						}
 					}
@@ -2184,7 +2180,6 @@ void DOUBLEMPM::computeNormals_DOUBLEMPM(const ProcessorGroup *,
 	}    // patches
 }
 
-
 // Compute extra momentum from the contact
 void DOUBLEMPM::scheduleExMomInterpolated(SchedulerP& sched,
 	const PatchSet* patches,
@@ -2196,70 +2191,6 @@ void DOUBLEMPM::scheduleExMomInterpolated(SchedulerP& sched,
 	printSchedule(patches, cout_doing, "MPM::scheduleExMomInterpolated");
 
 	contactModel->addComputesAndRequiresInterpolated(sched, patches, matls);
-}
-
-void DOUBLEMPM::scheduleVelLiquidContact(SchedulerP & sched,
-	const PatchSet* patches,
-	const MaterialSet* ms)
-{
-	Task * t = scinew Task("DOUBLEMPM::scheduleVelLiquidContact",
-		this, &DOUBLEMPM::VelLiquidContact);
-
-	const MaterialSubset* mss = ms->getUnion();
-	t->requires(Task::NewDW, lb->gMassLabel, Ghost::None);
-
-	//t->modifies(lb->gVelocityLabel, mss);
-	t->modifies(lb->gVelocityLiquidLabel, mss);
-
-	sched->addTask(t, patches, ms);
-}
-
-void DOUBLEMPM::VelLiquidContact(const ProcessorGroup*,
-	const PatchSubset* patches,
-	const MaterialSubset* matls,
-	DataWarehouse*,
-	DataWarehouse* new_dw)
-{
-		//string interp_type = flags->d_interpolator_type;
-		//int numMatls = d_materialManager->getNumMatls("MPM");
-		unsigned int numMatls = m_materialManager->getNumMatls("MPM");
-		ASSERTEQ(numMatls, matls->size());
-		for (int p = 0; p < patches->size(); p++) {
-			const Patch* patch = patches->get(p);
-			Vector centerOfMassVelocity(0.0, 0.0, 0.0);
-
-			// Retrieve necessary data from DataWarehouse
-			std::vector<constNCVariable<double> > gmass(numMatls);
-			//std::vector<NCVariable<Vector> > gvelocity(numMatls);
-			std::vector<NCVariable<Vector> > gvelocityLiquid(numMatls);
-			for (int m = 0; m < matls->size(); m++) {
-				int dwindex = matls->get(m);
-				new_dw->get(gmass[m], lb->gMassLabel, dwindex, patch, Ghost::None, 0);
-				//new_dw->getModifiable(gvelocity[m], lb->gVelocityLabel,dwindex, patch);
-				new_dw->getModifiable(gvelocityLiquid[m], lb->gVelocityLiquidLabel, dwindex, patch);
-			}
-
-			for (NodeIterator iter = patch->getNodeIterator(); !iter.done(); iter++) {
-				IntVector c = *iter;
-
-				Vector centerOfMassMom(0, 0, 0);
-				double centerOfMassMass = 0.0;
-				for (int n = 0; n < numMatls; n++) {
-					//if (d_matls.requested(n)) {
-					centerOfMassMom += gvelocityLiquid[n][c] * gmass[n][c];
-					centerOfMassMass += gmass[n][c];
-					//}
-				}
-
-				// Set each field's velocity equal to the center of mass velocity				
-				centerOfMassVelocity = centerOfMassMom / centerOfMassMass;
-			
-				for (int n = 0; n < numMatls; n++) {
-					//if (d_matls.requested(n)) {
-					gvelocityLiquid[n][c] = centerOfMassVelocity;
-				}
-			}
-		}
 }
 
 // Compute contact area of object boundary (for  if(d_bndy_traction_faces.size()>0))
@@ -2420,6 +2351,9 @@ void DOUBLEMPM::scheduleComputeInternalForce_DOUBLEMPM(SchedulerP& sched,
 	t->computes(double_lb->gInternalForceLiquidLabel, m_materialManager->getAllInOneMatls(),
 		Task::OutOfDomain);
 
+	// Structure
+	//t->computes(double_lb->gInternalForceStructureLabel);
+
 	// Boundary force
 	for (std::list<Patch::FaceType>::const_iterator ftit(d_bndy_traction_faces.begin());
 		ftit != d_bndy_traction_faces.end(); ftit++) {
@@ -2547,6 +2481,13 @@ void DOUBLEMPM::computeInternalForce_DOUBLEMPM(const ProcessorGroup*,
 			gPorePresure.initialize(0.0);
 			//gPoreTensor.initialize(Matrix3(0.0));
 
+			/*
+			// Structure
+			NCVariable<Vector>             ginternalforceStructure;
+			new_dw->allocateAndPut(ginternalforceStructure, double_lb->gInternalForceStructureLabel, dwi, patch);
+			ginternalforceStructure.initialize(Vector(0, 0, 0));
+			*/
+
 			// For artificial vicousity
 			ParticleVariable<double>  p_pressure_create;
 			new_dw->allocateTemporary(p_pressure_create, pset);
@@ -2612,7 +2553,7 @@ void DOUBLEMPM::computeInternalForce_DOUBLEMPM(const ProcessorGroup*,
 							}
 						}
 					} // End particle loop
-				}
+				}// End particleType loop
 
 				if (particleType == "solid" || particleType == "structure") {
 					for (ParticleSubset::iterator iter = pset->begin();
@@ -2641,7 +2582,34 @@ void DOUBLEMPM::computeInternalForce_DOUBLEMPM(const ProcessorGroup*,
 							}
 						}
 					} // End particle loop
-				}
+				}// End particleType loop
+				/*
+				if (particleType == "structure") {
+					for (ParticleSubset::iterator iter = pset->begin();
+						iter != pset->end();
+						iter++) {
+						particleIndex idx = *iter;
+
+						// Get the node indices that surround the cell
+						int NN =
+							interpolator->findCellAndWeightsAndShapeDerivatives(px[idx], ni, S,
+								d_S, psize[idx]);
+
+						// Consider the vicousity otherwise stresspress = pstress[idx];
+						stresspress = pstress[idx] + Id * (p_pressure[idx] - p_q[idx]);
+
+						for (int k = 0; k < NN; k++) {
+							if (patch->containsNode(ni[k])) {
+								Vector div(d_S[k].x()*oodx[0], d_S[k].y()*oodx[1],
+									d_S[k].z()*oodx[2]);
+
+								// Structure
+								ginternalforceStructure[ni[k]] -= (div * stresspress)  * pvol[idx];
+							}
+						}
+					} // End particle loop
+				}// End particleType loop
+				*/
 			}
 
 			// for the axisymmetric case (haven't develop for axi-symmetric case!!!!!)
@@ -2793,7 +2761,7 @@ void DOUBLEMPM::scheduleComputeAndIntegrateAcceleration_DOUBLEMPM(SchedulerP& sc
 	t->requires(Task::OldDW, lb->delTLabel);
 
 	// Solid
-	//t->requires(Task::NewDW, lb->gMassLabel, Ghost::None);
+	t->requires(Task::NewDW, lb->gMassLabel, Ghost::None);
 	t->requires(Task::NewDW, lb->gInternalForceLabel, Ghost::None);
 	t->requires(Task::NewDW, lb->gExternalForceLabel, Ghost::None);
 	t->requires(Task::NewDW, double_lb->gMassSolidLabel, Ghost::None);
@@ -2854,10 +2822,6 @@ void DOUBLEMPM::computeAndIntegrateAcceleration_DOUBLEMPM(const ProcessorGroup*,
 		Vector gravity = flags->d_gravity;
 		int globMatID = m_materialManager->getAllInOneMatls()->get(0);
 
-		// constNCVariable<Vector>       GradientVelocity;
-		//new_dw->get(GradientVelocity, double_lb->gGradientVelocityLabel,
-		//	globMatID, patch, Ghost::None, 0);
-
 		 constNCVariable<Vector>       gInternalForceglobalLiquid;
 		 constNCVariable<double>       gvolumeglobal, gmassglobalSolid, gmassglobalLiquid;
 		 constNCVariable<Vector>            gvelglobal, gvelglobalLiquid;
@@ -2891,10 +2855,10 @@ void DOUBLEMPM::computeAndIntegrateAcceleration_DOUBLEMPM(const ProcessorGroup*,
 
 			// Solid
 			constNCVariable<Vector> internalforce, externalforce, velocity;
-			constNCVariable<double> gMassSolid, gvolume;
+			constNCVariable<double> gmass, gMassSolid, gvolume;
 			new_dw->get(internalforce, lb->gInternalForceLabel, dwi, patch, gnone, 0);
 			new_dw->get(externalforce, lb->gExternalForceLabel, dwi, patch, gnone, 0);
-			//new_dw->get(mass, lb->gMassLabel, dwi, patch, gnone, 0);
+			new_dw->get(gmass, lb->gMassLabel, dwi, patch, gnone, 0);
 			new_dw->get(gMassSolid, double_lb->gMassSolidLabel, dwi, patch, gnone, 0);
 			new_dw->get(velocity, lb->gVelocityLabel, dwi, patch, gnone, 0);
 			new_dw->get(gvolume, lb->gVolumeLabel, dwi, patch, gnone, 0);
@@ -2996,8 +2960,8 @@ void DOUBLEMPM::computeAndIntegrateAcceleration_DOUBLEMPM(const ProcessorGroup*,
 
 					Vector acc(0., 0., 0.);
 
-					if (gMassSolid[c] > flags->d_min_mass_for_acceleration) {
-						acc = (internalforce[c] + externalforce[c]) / gMassSolid[c];
+					if (gmass[c] > flags->d_min_mass_for_acceleration) {
+						acc = (internalforce[c] + externalforce[c]) / gmass[c];
 						acc -= damp_coef * velocity[c];
 					}
 					acceleration[c] = acc + gravity;
@@ -3061,279 +3025,6 @@ void DOUBLEMPM::scheduleExMomIntegrated(SchedulerP& sched,
 	printSchedule(patches, cout_doing, "MPM::scheduleExMomIntegrated");
 	contactModel->addComputesAndRequiresIntegrated(sched, patches, matls);
 }
-/*
-void DOUBLEMPM::scheduleFrictionLiquidContact(SchedulerP & sched,
-	const PatchSet* patches,
-	const MaterialSet* ms)	
-{
-	if (!flags->doMPMOnLevel(getLevel(patches)->getIndex(),
-		getLevel(patches)->getGrid()->numLevels()))
-		return;
-	printSchedule(patches, cout_doing, "DOUBLEMPM::scheduleFrictionLiquidContact");
-	Task * t = scinew Task("DOUBLEMPM::FrictionLiquidContact",
-		this, &DOUBLEMPM::FrictionLiquidContact);
-
-	MaterialSubset* z_matl = scinew MaterialSubset();
-	z_matl->add(0);
-	z_matl->addReference();
-
-	const MaterialSubset* mss = ms->getUnion();
-	t->requires(Task::OldDW, lb->delTLabel);
-	t->requires(Task::NewDW, lb->gMassLabel, Ghost::None);
-	t->requires(Task::NewDW, lb->gVolumeLabel, Ghost::None);
-	t->requires(Task::NewDW, lb->gSurfNormLabel, Ghost::None);
-	t->requires(Task::NewDW, lb->gPositionLabel, Ghost::None);
-	t->requires(Task::NewDW, lb->gNormTractionLabel, Ghost::None);
-	t->requires(Task::OldDW, lb->NC_CCweightLabel, z_matl, Ghost::None);
-	t->modifies(lb->frictionalWorkLabel, mss);
-	//t->modifies(lb->gVelocityLabel,      mss);
-	t->modifies(double_lb->gVelocityLiquidLabel, mss);
-
-	sched->addTask(t, patches, ms);
-
-	if (z_matl->removeReference())
-		delete z_matl; // shouln't happen, but...
-}
-
-void DOUBLEMPM::FrictionLiquidContact(const ProcessorGroup*,
-	const PatchSubset* patches,
-	const MaterialSubset* matls,
-	DataWarehouse* old_dw,
-	DataWarehouse* new_dw)
-{
-		int numMatls = m_materialManager->getNumMatls("MPM");
-		ASSERTEQ(numMatls, matls->size());
-
-		// Need access to all velocity fields at once
-		std::vector<constNCVariable<double> >  gmass(numMatls);
-		std::vector<constNCVariable<double> >  gvolume(numMatls);
-		std::vector<constNCVariable<Point> >   gposition(numMatls);
-		std::vector<constNCVariable<Vector> >  gsurfnorm(numMatls);
-		std::vector<constNCVariable<double> >  gnormtraction(numMatls);
-		//std::vector<NCVariable<Vector> >       gvelocity(numMatls);
-		std::vector<NCVariable<Vector> >       gvelocityLiquid(numMatls);
-		std::vector<NCVariable<double> >       frictionWork(numMatls);
-
-		Ghost::GhostType  gnone = Ghost::None;
-
-		for (int p = 0; p < patches->size(); p++) {
-			const Patch* patch = patches->get(p);
-			Vector dx = patch->dCell();
-			double cell_vol = dx.x()*dx.y()*dx.z();
-			constNCVariable<double> NC_CCweight;
-			old_dw->get(NC_CCweight, lb->NC_CCweightLabel, 0, patch, gnone, 0);
-
-			delt_vartype delT;
-			old_dw->get(delT, lb->delTLabel, getLevel(patches));
-
-			// First, calculate the gradient of the mass everywhere
-			// normalize it, and stick it in surfNorm
-			for (int m = 0; m < numMatls; m++) {
-				int dwi = matls->get(m);
-				new_dw->get(gmass[m], lb->gMassLabel, dwi, patch, gnone, 0);
-				new_dw->get(gvolume[m], lb->gVolumeLabel, dwi, patch, gnone, 0);
-				new_dw->get(gsurfnorm[m], lb->gSurfNormLabel, dwi, patch, gnone, 0);
-				new_dw->get(gposition[m], lb->gPositionLabel, dwi, patch, gnone, 0);
-				new_dw->get(gnormtraction[m], lb->gNormTractionLabel,
-					dwi, patch, gnone, 0);
-				//new_dw->getModifiable(gvelocity[m],   lb->gVelocityLabel,      dwi,patch);
-				new_dw->getModifiable(gvelocityLiquid[m], double_lb->gVelocityLiquidLabel, dwi, patch);
-				new_dw->getModifiable(frictionWork[m], lb->frictionalWorkLabel, dwi, patch);
-			}  // loop over matls
-
-			double sepDis = 99e9 * cbrt(cell_vol);
-			for (NodeIterator iter = patch->getNodeIterator(); !iter.done(); iter++) {
-				IntVector c = *iter;
-				Vector centerOfMassMom(0., 0., 0.);
-				Point  centerOfMassPos(0., 0., 0.);
-				double centerOfMassMass = 0.0;
-				double totalNodalVol = 0.0;
-				for (int n = 0; n < numMatls; n++) {
-					if (!d_matls.requested(n)) continue;
-					centerOfMassMom += gvelocityLiquid[n][c] * gmass[n][c];
-					centerOfMassPos += gposition[n][c].asVector() * gmass[n][c];
-					centerOfMassMass += gmass[n][c];
-					totalNodalVol += gvolume[n][c] * 8.0*NC_CCweight[c];
-				}
-				centerOfMassPos /= centerOfMassMass;
-
-				// Apply Coulomb friction contact
-				// For grid points with mass calculate velocity
-				if (!compare(centerOfMassMass, 0.0)) {
-					Vector centerOfMassVelocity = centerOfMassMom / centerOfMassMass;
-
-					if (flags->d_axisymmetric) {
-						// Nodal volume isn't constant for axisymmetry
-						// volume = r*dr*dtheta*dy  (dtheta = 1 radian)
-						double r = min((patch->getNodePosition(c)).x(), .5*dx.x());
-						cell_vol = r * dx.x()*dx.y();
-					}
-
-					// Only apply contact if the node is full relative to a constraint
-					if ((totalNodalVol / cell_vol) > 0) {
-						double scale_factor = 1.0;  // Currently not used, should test again.
-
-						// Loop over velocity fields.  Only proceed if velocity field mass
-						// is nonzero (not numerical noise) and the difference from
-						// the centerOfMassVelocity is nonzero (More than one velocity
-						// field is contributing to grid vertex).
-						for (int n = 0; n < numMatls; n++) {
-							if (!d_matls.requested(n)) continue;
-							double mass = gmass[n][c];
-							Vector deltaVelocity = gvelocityLiquid[n][c] - centerOfMassVelocity;
-							if (!compare(mass / centerOfMassMass, 0.0)
-								&& !compare(mass - centerOfMassMass, 0.0)) {
-
-								// Apply frictional contact IF the surface is in compression
-								// OR the surface is stress free and approaching.
-								// Otherwise apply free surface conditions (do nothing).
-								Vector normal = gsurfnorm[n][c];
-								Vector sepvec = (centerOfMassMass / (centerOfMassMass - mass))*
-									(centerOfMassPos - gposition[n][c]);
-								//              double sepscal= Dot(sepvec,normal);
-								double sepscal = sepvec.length();
-								if (sepscal < sepDis) {
-									double normalDeltaVel = Dot(deltaVelocity, normal);
-									Vector Dv(0., 0., 0.);
-									double Tn = gnormtraction[n][c];
-									if ((Tn < -1.e-12) || (normalDeltaVel > 0.0)) {
-
-										// Simplify algorithm in case where approach velocity
-										// is in direction of surface normal (no slip).
-										Vector normal_normaldV = normal * normalDeltaVel;
-										Vector dV_normalDV = deltaVelocity - normal_normaldV;
-										if (compare(dV_normalDV.length2(), 0.0)) {
-
-											// Calculate velocity change needed to enforce contact
-											Dv = -normal_normaldV;
-										}
-
-										// General algorithm, including frictional slip.  The
-										// contact velocity change and frictional work are both
-										// zero if normalDeltaVel is zero.
-										else if (!compare(fabs(normalDeltaVel), 0.0)) {
-											Vector surfaceTangent = dV_normalDV / dV_normalDV.length();
-											double tangentDeltaVelocity = Dot(deltaVelocity, surfaceTangent);
-											double d_mu = 0.2;
-											double frictionCoefficient =
-												Min(d_mu, tangentDeltaVelocity / fabs(normalDeltaVel));
-
-											// Calculate velocity change needed to enforce contact
-											Dv = -normal_normaldV
-												- surfaceTangent * frictionCoefficient*fabs(normalDeltaVel);
-
-											// Calculate work done by the frictional force (only) if
-											// contact slips.  Because the frictional force opposes motion
-											// it is dissipative and should always be negative per the
-											// conventional definition.  However, here it is calculated
-											// as positive (Work=-force*distance).
-											if (compare(frictionCoefficient, d_mu)) {
-												frictionWork[n][c] = mass * frictionCoefficient *
-													(normalDeltaVel*normalDeltaVel) *
-													(tangentDeltaVelocity / fabs(normalDeltaVel)
-														- frictionCoefficient);
-											}
-										}
-
-										// Define contact algorithm imposed strain, find maximum
-										Vector epsilon = (Dv / dx)*delT;
-										double epsilon_max =
-											Max(fabs(epsilon.x()), fabs(epsilon.y()), fabs(epsilon.z()));
-										if (!compare(epsilon_max, 0.0)) {
-											epsilon_max *= Max(1.0, mass / (centerOfMassMass - mass));
-
-											// Scale velocity change if contact algorithm
-											// imposed strain is too large.
-											double ff = Min(epsilon_max, .5) / epsilon_max;
-											Dv = Dv * ff;
-										}
-										Dv = scale_factor * Dv;
-										gvelocityLiquid[n][c] += Dv;
-									}  // if traction
-								}   // if sepscal
-							}    // if !compare && !compare
-						}      // matls
-					}        // if (volume constraint)
-				}          // if(!compare(centerOfMassMass,0.0))
-			}            // NodeIterator
-		}  // patches
-}
-´*/
-
-
-void DOUBLEMPM::scheduleVelLiquidPlusContact(SchedulerP & sched,
-	const PatchSet* patches,
-	const MaterialSet* ms)
-{
-	Task * t = scinew Task("DOUBLEMPM::scheduleVelLiquidPlusContact",
-		this, &DOUBLEMPM::VelLiquidPlusContact);
-
-	const MaterialSubset* mss = ms->getUnion();
-	t->requires(Task::OldDW, lb->delTLabel);
-	t->requires(Task::NewDW, lb->gMassLabel, Ghost::None);
-
-	//t->modifies(lb->gVelocityStarLabel, mss);
-	t->modifies(lb->gVelocityStarLiquidLabel, mss);
-	sched->addTask(t, patches, ms);
-}
-
-void DOUBLEMPM::VelLiquidPlusContact(const ProcessorGroup*,
-	const PatchSubset* patches,
-	const MaterialSubset* matls,
-	DataWarehouse* old_dw,
-	DataWarehouse* new_dw)
-{
-	unsigned int numMatls = m_materialManager->getNumMatls("MPM");
-	ASSERTEQ(numMatls, matls->size());
-
-	for (int p = 0; p < patches->size(); p++) {
-		const Patch* patch = patches->get(p);
-		Vector zero(0.0, 0.0, 0.0);
-		Vector centerOfMassVelocity(0.0, 0.0, 0.0);
-		Vector centerOfMassMom(0.0, 0.0, 0.0);
-		Vector Dvdt;
-		double centerOfMassMass;
-
-		// Retrieve necessary data from DataWarehouse
-		std::vector<constNCVariable<double> > gmass(numMatls);
-		std::vector<NCVariable<Vector> > gvelocity_star(numMatls);
-		std::vector<NCVariable<Vector> > gvelocityLiquid_star(numMatls);
-		for (int m = 0; m < matls->size(); m++) {
-			int dwi = matls->get(m);
-			new_dw->get(gmass[m], lb->gMassLabel, dwi, patch, Ghost::None, 0);
-			//new_dw->getModifiable(gvelocity_star[m],lb->gVelocityStarLabel, dwi,patch);
-			new_dw->getModifiable(gvelocityLiquid_star[m], lb->gVelocityStarLiquidLabel,
-				dwi, patch);
-		}
-
-		delt_vartype delT;
-		old_dw->get(delT, lb->delTLabel, getLevel(patches));
-
-		for (NodeIterator iter = patch->getNodeIterator(); !iter.done(); iter++) {
-			IntVector c = *iter;
-
-			centerOfMassMom = 0.0;
-			centerOfMassMass = 0.0;
-			for (int n = 0; n < numMatls; n++) {
-				//if (d_matls.requested(n)) {
-					centerOfMassMom += gvelocityLiquid_star[n][c] * gmass[n][c];
-					centerOfMassMass += gmass[n][c];
-				//}
-			}
-
-			// Set each field's velocity equal to the center of mass velocity
-			centerOfMassVelocity = centerOfMassMom / centerOfMassMass;
-
-			for (int n = 0; n < numMatls; n++) {
-				//if (d_matls.requested(n)) {
-					Dvdt = (centerOfMassVelocity - gvelocityLiquid_star[n][c]) / delT;
-					gvelocityLiquid_star[n][c] = centerOfMassVelocity;
-				//}
-			}
-		}
-	}
-}
-
 
 // Boundary condition for 2 phases
 void DOUBLEMPM::scheduleSetGridBoundaryConditions_DOUBLEMPM(SchedulerP& sched,
@@ -4380,12 +4071,12 @@ void DOUBLEMPM::interpolateToParticlesAndUpdate_DOUBLEMPM(const ProcessorGroup*,
 						}
 
 						// Fix solid particles
-						//pxnew[idx] = px[idx];
+						pxnew[idx] = px[idx];
 
 						// Update particle vel and pos using Nairn's XPIC(2) method
-						pxnew[idx] = px[idx] + vel * delT
-							- 0.5*(acc*delT + (pvelocity[idx] - 2.0*pvelSSPlus[idx])
-								+ velSSPSSP)*delT;
+						//pxnew[idx] = px[idx] + vel * delT
+						//	- 0.5*(acc*delT + (pvelocity[idx] - 2.0*pvelSSPlus[idx])
+						//		+ velSSPSSP)*delT;
 						pvelnew[idx] = 2.0*pvelSSPlus[idx] - velSSPSSP + acc * delT;
 						pdispnew[idx] = pdisp[idx] + (pxnew[idx] - px[idx]);
 						pvelLiquidnew[idx] = 0;
@@ -4487,10 +4178,10 @@ void DOUBLEMPM::interpolateToParticlesAndUpdate_DOUBLEMPM(const ProcessorGroup*,
 						}
 
 						// Fix solid particles
-						//pxnew[idx] = px[idx];
+						pxnew[idx] = px[idx];
 
 						// Update the particle's pos and vel using std "FLIP" method
-						pxnew[idx] = px[idx] + vel * delT;
+						//pxnew[idx] = px[idx] + vel * delT;
 						pdispnew[idx] = pdisp[idx] + vel * delT;
 						pvelnew[idx] = pvelocity[idx] + acc * delT;
 

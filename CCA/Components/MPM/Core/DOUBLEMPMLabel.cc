@@ -117,7 +117,7 @@ DOUBLEMPMLabel::DOUBLEMPMLabel()
 
 	gInternalForceLiquidLabel	= VarLabel::create("g.internalforceLiquid", NCVariable<Vector>::getTypeDescription());
 
-	//gInternalForceStructureLabel = VarLabel::create("g.internalforceStructure", NCVariable<Vector>::getTypeDescription());
+	gInternalForceStructureLabel = VarLabel::create("g.internalforceStructure", NCVariable<Vector>::getTypeDescription());
 
 	gPorosityLabel = VarLabel::create("g.Porosity", NCVariable<double>::getTypeDescription());
 
@@ -213,7 +213,7 @@ DOUBLEMPMLabel::~DOUBLEMPMLabel()
 	VarLabel::destroy(gVelocityStarLiquidLabel);
 	VarLabel::destroy(gVelLiquidSPSSPLabel);
 	VarLabel::destroy(gInternalForceLiquidLabel);
-	//VarLabel::destroy(gInternalForceStructureLabel);
+	VarLabel::destroy(gInternalForceStructureLabel);
 	VarLabel::destroy(gPorosityLabel);
 	VarLabel::destroy(gDragForceLabel);
 	VarLabel::destroy(gGradientVelocityLabel);

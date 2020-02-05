@@ -280,27 +280,6 @@ namespace Uintah {
 		// Compute extra momentum from the contact
 		virtual void scheduleExMomInterpolated(SchedulerP&, const PatchSet*,
 			const MaterialSet*);
-		
-		virtual void scheduleVelLiquidContact(SchedulerP&, const PatchSet*,
-			const MaterialSet*);
-
-		virtual void VelLiquidContact(const ProcessorGroup*,
-			const PatchSubset* patches,
-			const MaterialSubset* matls,
-			DataWarehouse* old_dw,
-			DataWarehouse* new_dw);
-
-
-/*
-virtual void scheduleFrictionLiquidContact(SchedulerP&, const PatchSet*,
-	const MaterialSet*);
-
-virtual void FrictionLiquidContact(const ProcessorGroup*,
-	const PatchSubset* patches,
-	const MaterialSubset* matls,
-	DataWarehouse* old_dw,
-	DataWarehouse* new_dw);
-*/
 
 		// Compute contact area of object boundary
 		virtual void scheduleComputeContactArea(SchedulerP&, const PatchSet*,
@@ -337,16 +316,6 @@ virtual void FrictionLiquidContact(const ProcessorGroup*,
 		// Compute extra momentum from the contact
 		virtual void scheduleExMomIntegrated(SchedulerP&, const PatchSet*,
 			const MaterialSet*);
-
-		
-		virtual void scheduleVelLiquidPlusContact(SchedulerP&, const PatchSet*,
-			const MaterialSet*);
-
-		void VelLiquidPlusContact(const ProcessorGroup*,
-			const PatchSubset* patches,
-			const MaterialSubset*,
-			DataWarehouse* old_dw,
-			DataWarehouse* new_dw);
 
 		// Boundary condition for DOUBLEMPM
 		void scheduleSetGridBoundaryConditions_DOUBLEMPM(SchedulerP&, const PatchSet*,

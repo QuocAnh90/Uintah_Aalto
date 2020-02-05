@@ -104,7 +104,7 @@ namespace Uintah {
 		const VarLabel* gVelocityStarLiquidLabel;
 		const VarLabel* gVelLiquidSPSSPLabel;
 		const VarLabel* gInternalForceLiquidLabel;
-		//const VarLabel* gInternalForceStructureLabel;
+		const VarLabel* gInternalForceStructureLabel;
 
 		const VarLabel* gPorosityLabel;
 		const VarLabel* gDragForceLabel;
