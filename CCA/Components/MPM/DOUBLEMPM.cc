@@ -2124,9 +2124,7 @@ void DOUBLEMPM::computeNormals_DOUBLEMPM(const ProcessorGroup *,
 							gdisp[m][ni[k]] += pdisp[idx] * mass * S[k];
 							gstress[m][ni[k]] += pstress[idx] * S[k];
 						}
-					}
-
-					
+					}					
 				}
 			} // axisymmetric conditional
 		}   // matl loop
@@ -2175,7 +2173,6 @@ void DOUBLEMPM::computeNormals_DOUBLEMPM(const ProcessorGroup *,
 				gdisp[m][c] /= gmass[m][c];
 			}
 		}  // loop over matls
-
 		delete interpolator;
 	}    // patches
 }
@@ -2583,33 +2580,6 @@ void DOUBLEMPM::computeInternalForce_DOUBLEMPM(const ProcessorGroup*,
 						}
 					} // End particle loop
 				}// End particleType loop
-				/*
-				if (particleType == "structure") {
-					for (ParticleSubset::iterator iter = pset->begin();
-						iter != pset->end();
-						iter++) {
-						particleIndex idx = *iter;
-
-						// Get the node indices that surround the cell
-						int NN =
-							interpolator->findCellAndWeightsAndShapeDerivatives(px[idx], ni, S,
-								d_S, psize[idx]);
-
-						// Consider the vicousity otherwise stresspress = pstress[idx];
-						stresspress = pstress[idx] + Id * (p_pressure[idx] - p_q[idx]);
-
-						for (int k = 0; k < NN; k++) {
-							if (patch->containsNode(ni[k])) {
-								Vector div(d_S[k].x()*oodx[0], d_S[k].y()*oodx[1],
-									d_S[k].z()*oodx[2]);
-
-								// Structure
-								ginternalforceStructure[ni[k]] -= (div * stresspress)  * pvol[idx];
-							}
-						}
-					} // End particle loop
-				}// End particleType loop
-				*/
 			}
 
 			// for the axisymmetric case (haven't develop for axi-symmetric case!!!!!)
@@ -2797,13 +2767,6 @@ void DOUBLEMPM::scheduleComputeAndIntegrateAcceleration_DOUBLEMPM(SchedulerP& sc
 		Task::OutOfDomain, Ghost::None);
 	t->computes(lb->gVelocityStarLiquidLabel, m_materialManager->getAllInOneMatls(),
 		Task::OutOfDomain);
-
-	//t->requires(Task::NewDW, double_lb->gGradientVelocityLabel, m_materialManager->getAllInOneMatls(),
-	//	Task::OutOfDomain, Ghost::None);
-
-	//t->computes(double_lb->gVelocityMixLabel, m_materialManager->getAllInOneMatls(),
-	//	Task::OutOfDomain);
-
 	sched->addTask(t, patches, matls);
 }
 
@@ -2891,10 +2854,6 @@ void DOUBLEMPM::computeAndIntegrateAcceleration_DOUBLEMPM(const ProcessorGroup*,
 			new_dw->allocateAndPut(gPorosity, double_lb->gPorosityLabel, dwi, patch);
 			gPorosity.initialize(1.0);
 
-			//NCVariable<Vector>       gVelocityMix;
-			//new_dw->allocateAndPut(gVelocityMix, double_lb->gVelocityMixLabel, dwi, patch);
-			//gVelocityMix.copyData(gVelocityLiquid);
-
 			double psp = mpm_matl->getInitialDensity();
 			string particleType = mpm_matl->getParticleType();
 				
@@ -2907,22 +2866,22 @@ void DOUBLEMPM::computeAndIntegrateAcceleration_DOUBLEMPM(const ProcessorGroup*,
 					Vector DraggingForce(0., 0., 0.);
 					Vector GradientVelocity(0., 0., 0.);
 
-					if (gMassLiquid[c] > flags->d_min_mass_for_acceleration) {
-						
+					if (gMassLiquid[c] > flags->d_min_mass_for_acceleration) {					
 						if (gmassglobalSolid[c] > flags->d_min_mass_for_acceleration) {
 							gPorosity[c] = 1 - (gmassglobalSolid[c] / (psp * gvolumeglobal[c]));
 							GradientVelocity = gVelocityLiquid[c] - gvelglobal[c];
 							DraggingForce = (gMassLiquid[c] * 10 / gPermeability[c]) * GradientVelocity;
-						}
-					
+						}					
 						accLiquid = (gPorosity[c] * gInternalForceLiquid[c] - gPorosity[c] * DraggingForce) / gMassLiquid[c];
 						accLiquid -= damp_coef * gVelocityLiquid[c];					
-
 					}
-
 					gAccelerationLiquid[c] = accLiquid + gravity;		
 					gVelocityStarLiquid[c] = gVelocityLiquid[c] + gAccelerationLiquid[c] * delT;
 					gvelglobalLiquidnew[c] += gVelocityStarLiquid[c];
+
+					//if (gAccelerationLiquid[c].length2() > 10000000000) {
+						//cerr << gAccelerationLiquid[c] << "mass" << gMassLiquid[c] << endl;
+					//}
 				}
 			}
 
@@ -4015,14 +3974,14 @@ void DOUBLEMPM::interpolateToParticlesAndUpdate_DOUBLEMPM(const ProcessorGroup*,
 						}
 
 						// Update the particle's pos and vel using std "FLIP" method
-						pxnew[idx] = px[idx] + velLiquid * delT;
+						//pxnew[idx] = px[idx] + velLiquid * delT;
 						//pdispnew[idx] = pdisp[idx] + velLiquid * delT;
 						//pvelLiquidnew[idx] = pVelocityLiquid[idx] + accLiquid * delT;
 
 						// Update particle vel and pos using Nairn's XPIC(2) method
-						//pxnew[idx] = px[idx] + velLiquid * delT
-						//	- 0.5*(accLiquid*delT + (pVelocityLiquid[idx] - 2.0*pvelLiquidSSPlus[idx])
-						//		+ velLiquidSSPSSP)*delT;
+						pxnew[idx] = px[idx] + velLiquid * delT
+							- 0.5*(accLiquid*delT + (pVelocityLiquid[idx] - 2.0*pvelLiquidSSPlus[idx])
+								+ velLiquidSSPSSP)*delT;
 					
 						pvelLiquidnew[idx] = 2.0*pvelLiquidSSPlus[idx] - velLiquidSSPSSP + accLiquid * delT;
 						pdispnew[idx] = pdisp[idx] + (pxnew[idx] - px[idx]);
@@ -4071,12 +4030,12 @@ void DOUBLEMPM::interpolateToParticlesAndUpdate_DOUBLEMPM(const ProcessorGroup*,
 						}
 
 						// Fix solid particles
-						pxnew[idx] = px[idx];
+						//pxnew[idx] = px[idx];
 
 						// Update particle vel and pos using Nairn's XPIC(2) method
-						//pxnew[idx] = px[idx] + vel * delT
-						//	- 0.5*(acc*delT + (pvelocity[idx] - 2.0*pvelSSPlus[idx])
-						//		+ velSSPSSP)*delT;
+						pxnew[idx] = px[idx] + vel * delT
+							- 0.5*(acc*delT + (pvelocity[idx] - 2.0*pvelSSPlus[idx])
+								+ velSSPSSP)*delT;
 						pvelnew[idx] = 2.0*pvelSSPlus[idx] - velSSPSSP + acc * delT;
 						pdispnew[idx] = pdisp[idx] + (pxnew[idx] - px[idx]);
 						pvelLiquidnew[idx] = 0;
@@ -4326,7 +4285,7 @@ void DOUBLEMPM::scheduleComputeParticleGradientsAndPorePressure_DOUBLEMPM(Schedu
 	t->requires(Task::OldDW, double_lb->pPorosityLabel, gnone);
 	t->requires(Task::OldDW, double_lb->pBulkModulLiquidLabel, gnone);
 	t->requires(Task::OldDW, double_lb->pPorePressureLabel, gnone);
-	//t->requires(Task::OldDW, double_lb->pPoreTensorLabel, gnone);
+	t->requires(Task::OldDW, double_lb->pPoreTensorLabel, gnone);
 	t->requires(Task::NewDW, lb->gVelocityStarLiquidLabel, gac, NGN);
 
 	// MPI?
@@ -4407,9 +4366,10 @@ void DOUBLEMPM::computeParticleGradientsAndPorePressure_DOUBLEMPM(const Processo
 			new_dw->get(gvelocity_star, lb->gVelocityStarLabel, dwi, patch, gac, NGP);
 
 			// Liquid
+
 			//constNCVariable<Vector>  gVelocityStarLiquid;
 			constParticleVariable<double>  pPorosity, pBulkModulLiquid, pPorePressure;
-			//constParticleVariable<Matrix3>  pPoreTensor;
+			constParticleVariable<Matrix3>  pPoreTensor;
 			ParticleVariable<Matrix3> pVelocityGradLiquid;
 			ParticleVariable<Matrix3> pPoreTensornew;
 			ParticleVariable<double> pPorePressurenew, pPorositynew;
@@ -4419,7 +4379,7 @@ void DOUBLEMPM::computeParticleGradientsAndPorePressure_DOUBLEMPM(const Processo
 			old_dw->get(pBulkModulLiquid, double_lb->pBulkModulLiquidLabel, pset);
 			old_dw->get(pPorePressure, double_lb->pPorePressureLabel, pset);
 			old_dw->get(pMassLiquid, double_lb->pMassLiquidLabel, pset);
-			//old_dw->get(pPoreTensor, double_lb->pPoreTensorLabel, pset);
+			old_dw->get(pPoreTensor, double_lb->pPoreTensorLabel, pset);
 			
 			//new_dw->get(gVelocityStarLiquid, lb->gVelocityStarLiquidLabel, dwi, patch, gac, NGP);
 			new_dw->allocateAndPut(pVelocityGradLiquid, double_lb->pVelocityGradLiquidLabel_preReloc, pset);
@@ -4472,30 +4432,6 @@ void DOUBLEMPM::computeParticleGradientsAndPorePressure_DOUBLEMPM(const Processo
 					pVelGrad[idx] = 0;
 					pTempGrad[idx] = Vector(0.0, 0.0, 0.0);
 
-					/*
-					// Update deformation gradient
-					if (flags->d_min_subcycles_for_F > 0) {
-						double Lnorm_dt = tensorLLiquid.Norm()*delT;
-						int num_scs = min(max(flags->d_min_subcycles_for_F,
-							2 * ((int)Lnorm_dt)), 10000);
-						//if(num_scs > 1000){
-						//  cout << "NUM_SCS = " << num_scs << endl;
-						//}
-						double dtsc = delT / (double(num_scs));
-						Matrix3 OP_tensorL_DT = Identity + tensorLLiquid * dtsc;
-						Matrix3 F = pFOld[idx];
-						for (int n = 0; n < num_scs; n++) {
-							F = OP_tensorL_DT * F;
-						}
-						pFNew[idx] = F;
-					}
-					else {
-						Matrix3 Amat = tensorLLiquid * delT;
-						Matrix3 Finc = Amat.Exponential(abs(flags->d_min_subcycles_for_F));
-						pFNew[idx] = Finc * pFOld[idx];
-					}
-					*/
-
 					// Update volume
 					Matrix3 Amat = tensorLLiquid * delT;
 					
@@ -4525,7 +4461,9 @@ void DOUBLEMPM::computeParticleGradientsAndPorePressure_DOUBLEMPM(const Processo
 						Matrix3 Shear = DPrime * (2.*0.5); //0.5 is viscousity
 
 						double jtotheminusgamma = pow(J, -7); // y is gamma
+
 						double p = pBulkModulLiquid[idx] * (jtotheminusgamma - 1.0);
+						//double p = 20000000 * (jtotheminusgamma - 1.0);
 
 						// compute the total stress (volumetric + deviatoric)
 						pPorePressurenew[idx] = -p;//Identity * (-p) +Shear;
@@ -4587,6 +4525,17 @@ void DOUBLEMPM::computeParticleGradientsAndPorePressure_DOUBLEMPM(const Processo
 						Matrix3 Amat = tensorL * delT;
 						Matrix3 Finc = Amat.Exponential(abs(flags->d_min_subcycles_for_F));
 						pFNew[idx] = Finc * pFOld[idx];
+					}
+
+					// Temporary hack
+					double Jtest = pFNew[idx].Determinant();
+
+					if (Jtest <= 0) {
+						pFNew[idx] = pFOld[idx];
+						}
+
+					if (std::isnan(Jtest)) {
+						pFNew[idx] = pFOld[idx];
 					}
 
 					double J = pFNew[idx].Determinant();
@@ -4662,12 +4611,20 @@ void DOUBLEMPM::computeParticleGradientsAndPorePressure_DOUBLEMPM(const Processo
 			if (flags->d_NullSpaceFilter) {
 				if (particleType == "liquid") {
 					CCVariable<Matrix3> pore_CC;
+					CCVariable<double> pore_volume;
+					CCVariable<double> volume;
 					CCVariable<double> count;
 					CCVariable<double> filter;
+
 					new_dw->allocateTemporary(pore_CC, patch);
+					new_dw->allocateTemporary(pore_volume, patch);
+					new_dw->allocateTemporary(volume, patch);
 					new_dw->allocateTemporary(count, patch);
 					new_dw->allocateTemporary(filter, patch);
+
 					pore_CC.initialize(Matrix3(0.0));
+					pore_volume.initialize(0.);
+					volume.initialize(0.);
 					count.initialize(0.);
 					filter.initialize(0.);
 
@@ -4679,6 +4636,8 @@ void DOUBLEMPM::computeParticleGradientsAndPorePressure_DOUBLEMPM(const Processo
 						patch->findCell(px[idx], cell_index);
 
 						pore_CC[cell_index] += pPoreTensornew[idx];
+						pore_volume[cell_index] += pPorePressurenew[idx];
+						volume[cell_index] += pvolume[idx];
 						count[cell_index] += 1;
 					}
 
@@ -4687,6 +4646,7 @@ void DOUBLEMPM::computeParticleGradientsAndPorePressure_DOUBLEMPM(const Processo
 
 						if (count[c] > 1) {
 							pore_CC[c] /= count[c];
+							pore_volume[c] /= count[c];
 							filter[c] = 1;
 						}
 					}
@@ -4699,7 +4659,21 @@ void DOUBLEMPM::computeParticleGradientsAndPorePressure_DOUBLEMPM(const Processo
 
 						if (filter[cell_index] == 1) {
 							pPoreTensornew[idx] = pore_CC[cell_index];
+							pPorePressurenew[idx] = pore_volume[cell_index];
 						}
+					
+						/*
+						// Cell crossing error mitigation
+						double dcell_volume = patch->cellVolume();
+						double critical_cell_volume = 0.9 * dcell_volume;
+
+						if (volume[cell_index] < critical_cell_volume) {
+							pPoreTensornew[idx] = pPoreTensor[idx];
+							pPorePressurenew[idx] = pPorePressure[idx];
+							//pPoreTensornew[idx] = Matrix3(0.0);
+							//pPorePressurenew[idx] = 0;						
+						}		
+						*/
 					}
 				}
 			} //end of Average stress loop  at the patch level
@@ -5277,6 +5251,13 @@ void DOUBLEMPM::insertParticles(const ProcessorGroup*,
 
 		delt_vartype delT;
 		old_dw->get(delT, lb->delTLabel, getLevel(patches));
+
+		/*
+		d_IPTimes.push_back(t1);
+		d_IPColor.push_back(color);
+		d_IPTranslate.push_back(Vector(transx, transy, transz));
+		d_IPVelNew.push_back(Vector(v_new_x, v_new_y, v_new_z));
+		*/
 
 		int index = -999;
 		for (int i = 0; i < (int)d_IPTimes.size(); i++) {
