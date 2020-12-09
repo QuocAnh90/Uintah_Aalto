@@ -302,7 +302,7 @@ MPMMaterial::copyWithoutGeom(ProblemSpecP& ps,const MPMMaterial* mat,
   d_densityLiquid = mat->d_densityLiquid;
   d_Porosity = mat->d_Porosity;
   d_Permeability = mat->d_Permeability;
-  d_Permeability = mat->d_BulkLiquidModulus;
+  d_BulkLiquidModulus = mat->d_BulkLiquidModulus;
   }
   // Check to see which ParticleCreator object we need
   d_particle_creator = ParticleCreatorFactory::create(ps,this,flags);
