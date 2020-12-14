@@ -126,11 +126,11 @@ MPMMaterial::standardInitialization(ProblemSpecP& ps,
   ps->require("specific_heat",d_specificHeat);
   
   if (flags->d_DOUBLEMPM) {
-	  ps->require("particle_type", d_particleType);
-	  ps->require("density_liquid", d_densityLiquid);
-	  ps->require("Porosity", d_Porosity);
-	  ps->require("Permeability", d_Permeability);
-	  ps->require("BulkLiquidModulus", d_BulkLiquidModulus);
+	  ps->get("particle_type", d_particleType);
+	  ps->get("density_liquid", d_densityLiquid);
+	  ps->get("Porosity", d_Porosity);
+	  ps->get("Permeability", d_Permeability);
+	  ps->get("BulkLiquidModulus", d_BulkLiquidModulus);
   }
 
   // Assume the the centered specific heat is C_v
